@@ -18,32 +18,38 @@ struct is_placeholder<placeholder<N>> {
   static constexpr auto value = N;
 };
 
-template <unsigned N>
-struct tens {
-  static constexpr unsigned value = 10 * tens<N - 1>::value;
-};
+namespace detail {
 
-template <>
-struct tens<0u> {
-  static constexpr unsigned value = 1;
-};
+  template <unsigned N>
+  struct tens {
+    static constexpr unsigned value = 10 * tens<N - 1>::value;
+  };
 
-template <char...>
-struct decimal_value;
+  template <>
+  struct tens<0u> {
+    static constexpr unsigned value = 1;
+  };
 
-template <>
-struct decimal_value<> {
-  static constexpr unsigned value = 0;
-};
+  template <char...>
+  struct decimal_value;
 
-template <char first, char... rest>
-struct decimal_value<first, rest...> {
-  static constexpr unsigned value =
-      (first - '0') * tens<sizeof...(rest)>::value + decimal_value<rest...>::value;
-};
+  template <>
+  struct decimal_value<> {
+    static constexpr unsigned value = 0;
+  };
+
+  template <char first, char... rest>
+  struct decimal_value<first, rest...> {
+    static constexpr unsigned value =
+        (first - '0') * tens<sizeof...(rest)>::value +
+        decimal_value<rest...>::value;
+  };
+
+} // namespace detail
 
 template <char... digits>
-inline constexpr placeholder<decimal_value<digits...>::value> operator""_ph() {
+inline constexpr placeholder<detail::decimal_value<digits...>::value>
+operator""_ph() {
   return {};
 }
 
