@@ -14,8 +14,8 @@ constexpr auto get_type_name() {
   constexpr auto suffix = "]";
   constexpr auto function = std::string_view{__PRETTY_FUNCTION__};
 #elif defined(__GNUC__)
-  constexpr auto prefix = std::string_view{"with T = "};
-  constexpr auto suffix = "]; ";
+  constexpr auto prefix = std::string_view{"[with T = "};
+  constexpr auto suffix = "]";
   constexpr auto function = std::string_view{__PRETTY_FUNCTION__};
 #elif defined(__MSC_VER)
   constexpr auto prefix = std::string_view{"get_type_name<"};
@@ -36,6 +36,7 @@ constexpr auto get_type_name() {
 
 #else
 
+#if __has_include(<boost/type_index.hpp>)
 #include <boost/type_index.hpp>
 #include <string>
 
@@ -47,6 +48,10 @@ inline std::string get_type_name() {
 }
 
 } // namespace gkxx
+
+#else
+#error <boost/type_index.hpp> is required for standards before C++17.
+#endif // boost
 
 #endif // C++17
 
