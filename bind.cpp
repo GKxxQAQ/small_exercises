@@ -48,8 +48,8 @@ namespace detail {
 } // namespace detail
 
 template <char... digits>
-inline constexpr placeholder<detail::decimal_value<digits...>::value>
-operator""_ph() {
+inline constexpr auto operator""_ph()
+    -> placeholder<detail::decimal_value<digits...>::value> {
   return {};
 }
 
