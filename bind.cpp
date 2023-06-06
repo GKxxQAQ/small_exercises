@@ -8,17 +8,6 @@ namespace placeholders {
 template <unsigned N>
 struct placeholder {};
 
-inline constexpr placeholder<1> _1{};
-inline constexpr placeholder<2> _2{};
-inline constexpr placeholder<3> _3{};
-inline constexpr placeholder<4> _4{};
-inline constexpr placeholder<5> _5{};
-inline constexpr placeholder<6> _6{};
-inline constexpr placeholder<7> _7{};
-inline constexpr placeholder<8> _8{};
-inline constexpr placeholder<9> _9{};
-inline constexpr placeholder<10> _10{};
-
 template <typename>
 struct is_placeholder {
   static constexpr auto value = 0u;
@@ -28,6 +17,35 @@ template <unsigned N>
 struct is_placeholder<placeholder<N>> {
   static constexpr auto value = N;
 };
+
+template <unsigned N>
+struct tens {
+  static constexpr unsigned value = 10 * tens<N - 1>::value;
+};
+
+template <>
+struct tens<0u> {
+  static constexpr unsigned value = 1;
+};
+
+template <char...>
+struct decimal_value;
+
+template <>
+struct decimal_value<> {
+  static constexpr unsigned value = 0;
+};
+
+template <char first, char... rest>
+struct decimal_value<first, rest...> {
+  static constexpr unsigned value =
+      (first - '0') * tens<sizeof...(rest)>::value + decimal_value<rest...>::value;
+};
+
+template <char... digits>
+inline constexpr placeholder<decimal_value<digits...>::value> operator""_ph() {
+  return {};
+}
 
 } // namespace placeholders
 
@@ -117,7 +135,7 @@ void foo(X &) {}
 int main() {
   using namespace placeholders;
   int n = 7;
-  auto f1 = bind(f, _2, 42, _1, std::cref(n), n);
+  auto f1 = bind(f, 2_ph, 42, 1_ph, std::cref(n), n);
   n = 10;
   f1(1, 2, 1001);
   X x{};
