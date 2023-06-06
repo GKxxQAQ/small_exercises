@@ -45,13 +45,10 @@ struct bind_result {
 
  private:
   template <typename>
-  struct is_reference_wrapper {
-    static constexpr auto value = false;
-  };
+  struct is_reference_wrapper : std::false_type {};
+
   template <typename T>
-  struct is_reference_wrapper<std::reference_wrapper<T>> {
-    static constexpr auto value = true;
-  };
+  struct is_reference_wrapper<std::reference_wrapper<T>> : std::true_type {};
 
   template <typename>
   struct helper {};
