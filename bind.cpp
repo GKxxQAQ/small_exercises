@@ -48,7 +48,7 @@ namespace detail {
 } // namespace detail
 
 template <char... digits>
-inline constexpr auto operator""_ph()
+inline constexpr auto operator""_arg()
     -> placeholder<detail::decimal_value<digits...>::value> {
   return {};
 }
@@ -141,7 +141,7 @@ void foo(X &) {}
 int main() {
   using namespace placeholders;
   int n = 7;
-  auto f1 = bind(f, 2_ph, 42, 1_ph, std::cref(n), n);
+  auto f1 = bind(f, 2_arg, 42, 1_arg, std::cref(n), n);
   n = 10;
   f1(1, 2, 1001);
   X x{};
