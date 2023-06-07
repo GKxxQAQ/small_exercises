@@ -1,16 +1,11 @@
-template <unsigned D, unsigned N>
-struct divides {
-  static constexpr auto result = (N % D == 0);
-};
-
 template <unsigned L, unsigned R, unsigned N>
 struct any_divides {
   static constexpr auto result =
-      divides<L, N>::result || any_divides<L + 1, R, N>::result;
+      (N % L == 0) || any_divides<L + 1, R, N>::result;
 };
 template <unsigned L, unsigned N>
 struct any_divides<L, L, N> {
-  static constexpr auto result = divides<L, N>::result;
+  static constexpr auto result = (N % L == 0);
 };
 
 template <unsigned N>
@@ -52,15 +47,16 @@ template <template <unsigned> typename F, unsigned L, unsigned R>
 using result_sequence = typename result_sequence_impl<F, L, R>::type;
 
 template <unsigned... vals>
-struct containing {
+struct set {
   template <unsigned x>
-  struct apply {
+  struct contains {
     static constexpr auto result = (... || (x == vals));
   };
 };
 
 template <unsigned L, unsigned R, unsigned... true_vals>
-using bool_sequence = result_sequence<containing<true_vals...>::template apply, L, R>;
+using bool_sequence =
+    result_sequence<set<true_vals...>::template contains, L, R>;
 
 template <typename X, typename Y>
 inline constexpr auto same_type = false;
