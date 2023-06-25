@@ -206,7 +206,7 @@ inline any make_any(std::initializer_list<U> il, Args &&...args) {
 namespace std {
 
 template <>
-inline void swap(gkxx::any &lhs, gkxx::any &rhs) {
+inline void swap(gkxx::any &lhs, gkxx::any &rhs) noexcept {
   lhs.swap(rhs);
 }
 
