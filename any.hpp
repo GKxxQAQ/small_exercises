@@ -6,6 +6,7 @@
 #include <type_traits>
 #include <typeinfo>
 #include <utility>
+#include <algorithm>
 
 namespace gkxx {
 
@@ -201,5 +202,14 @@ inline any make_any(std::initializer_list<U> il, Args &&...args) {
 }
 
 } // namespace gkxx
+
+namespace std {
+
+template <>
+void swap(gkxx::any &lhs, gkxx::any &rhs) {
+  lhs.swap(rhs);
+}
+
+} // namespace std
 
 #endif // GKXX_ANY_HPP
