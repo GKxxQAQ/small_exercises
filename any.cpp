@@ -1,7 +1,7 @@
 #include <memory>
 #include <type_traits>
-#include <utility>
 #include <typeinfo>
+#include <utility>
 
 template <typename T>
 struct in_place_type_t {
@@ -19,7 +19,10 @@ class any {
   };
   template <typename ValueType>
   struct wrapper final : public wrapper_base {
+    static_cast(std::is_same_v<ValueType, std::decay_t<ValueType>>);
+
     ValueType thing;
+
     template <typename... Args>
     wrapper(Args &&...args) : thing(std::forward<Args>(args)...) {}
     std::unique_ptr<wrapper_base> clone() const final {
@@ -51,25 +54,26 @@ class any {
   ~any() = default;
 
   template <typename ValueType>
-  requires(!std::is_same_v<std::decay_t<ValueType>, any> &&
-           !is_in_place_type<std::decay_t<ValueType>>::value &&
-           std::is_copy_constructible_v<std::decay_t<ValueType>>)
+    requires(!std::is_same_v<std::decay_t<ValueType>, any> &&
+             !is_in_place_type<std::decay_t<ValueType>>::value &&
+             std::is_copy_constructible_v<std::decay_t<ValueType>>)
   any(ValueType &&x)
-      : pimpl(std::make_unique<std::decay_t<ValueType>>(
+      : pimpl(std::make_unique<wrapper<std::decay_t<ValueType>>>(
             std::forward<ValueType>(x))) {}
 
   template <typename ValueType, typename... Args>
-  requires(std::is_constructible_v<std::decay_t<ValueType>, Args...> &&
-           std::is_copy_constructible_v<std::decay_t<ValueType>>)
+    requires(std::is_constructible_v<std::decay_t<ValueType>, Args...> &&
+             std::is_copy_constructible_v<std::decay_t<ValueType>>)
   any(in_place_type_t<ValueType>, Args &&...args)
-      : pimpl(std::make_unique<std::decay_t<ValueType>>(
+      : pimpl(std::make_unique<wrapper<std::decay_t<ValueType>>>(
             std::forward<Args>(args)...)) {}
 
   template <typename ValueType, typename... Args>
-  requires(std::is_constructible_v<std::decay_t<ValueType>, Args...> &&
-           std::is_copy_constructible_v<std::decay_t<ValueType>>)
+    requires(std::is_constructible_v<std::decay_t<ValueType>, Args...> &&
+             std::is_copy_constructible_v<std::decay_t<ValueType>>)
   std::decay_t<ValueType> &emplace(Args &&...args) {
-    pimpl = std::make_unique<std::decay_t<ValueType>>(std::forward<Args>(args)...);
+    pimpl = std::make_unique<wrapper<std::decay_t<ValueType>>>(
+        std::forward<Args>(args)...);
     return *pimpl;
   }
 
@@ -78,7 +82,7 @@ class any {
   }
 
   bool has_value() const noexcept {
-    return static_cast<bool>(pimpl);
+    return !!pimpl;
   }
 
   const std::type_info &type() const noexcept {
@@ -87,4 +91,58 @@ class any {
     else
       return typeid(void);
   }
+
+ private:
+  template <typename T>
+  const T *get_raw_ptr() const noexcept {
+    return &static_cast<wrapper<T> *>(pimpl.get()).thing;
+  }
+  template <typename T>
+  T *get_raw_ptr() noexcept {
+    return &static_cast<wrapper<T> *>(pimpl.get()).thing;
+  }
+
+  template <typename T>
+  friend const T *any_cast(const any *operand) noexcept {
+    if (operand && typeid(T) == operand->type())
+      return operand->get_raw_ptr<T>();
+    return nullptr;
+  }
+
+  template <typename T>
+  friend T *any_cast(any *operand) noexcept {
+    if (operand && typeid(T) == operand->type())
+      return operand->get_raw_ptr<T>();
+    return nullptr;
+  }
 };
+
+template <typename T>
+inline T any_cast(const any &operand) {
+  using U = std::remove_cv_t<std::remove_reference_t<T>>;
+  static_assert(std::is_constructible_v<T, const U &>);
+  auto ptr = any_cast<U>(&operand);
+  if (!ptr)
+    throw bad_any_cast{};
+  return static_cast<T>(*ptr);
+}
+
+template <typename T>
+inline T any_cast(any &operand) {
+  using U = std::remove_cv_t<std::remove_reference_t<T>>;
+  static_assert(std::is_constructible_v<T, U &>);
+  auto ptr = any_cast<U>(&operand);
+  if (!ptr)
+    throw bad_any_cast{};
+  return static_cast<T>(*ptr);
+}
+
+template <typename T>
+inline T any_cast(any &&operand) {
+  using U = std::remove_cv_t<std::remove_reference_t<T>>;
+  static_assert(std::is_constructible_v<T, U>);
+  auto ptr = any_cast<U>(&operand);
+  if (!ptr)
+    throw bad_any_cast{};
+  return static_cast<T>(std::move(*ptr));
+}
