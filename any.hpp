@@ -55,7 +55,7 @@ class any {
  public:
   constexpr any() noexcept = default;
 
-  any(const any &other) : pimpl(pimpl ? other.pimpl->clone() : nullptr) {}
+  any(const any &other) : pimpl(other.pimpl ? other.pimpl->clone() : nullptr) {}
   any(any &&) noexcept = default;
   void swap(any &other) noexcept {
     pimpl.swap(other.pimpl);
