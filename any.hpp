@@ -190,6 +190,16 @@ inline T *any_cast(any *operand) noexcept {
   return nullptr;
 }
 
+template <typename T, typename... Args>
+inline any make_any(Args &&...args) {
+  return any(in_place_type<T>, std::forward<Args>(args)...);
+}
+
+template <typename T, typename U, typename... Args>
+inline any make_any(std::initializer_list<U> il, Args &&...args) {
+  return any(in_place_type<T>, il, std::forward<Args>(args)...);
+}
+
 } // namespace gkxx
 
 #endif // GKXX_ANY_HPP
