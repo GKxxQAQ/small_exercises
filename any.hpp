@@ -1,7 +1,13 @@
+#ifndef GKXX_ANY_HPP
+#define GKXX_ANY_HPP
+
+#include <initializer_list>
 #include <memory>
 #include <type_traits>
 #include <typeinfo>
 #include <utility>
+
+namespace gkxx {
 
 template <typename T>
 struct in_place_type_t {
@@ -11,15 +17,22 @@ struct in_place_type_t {
 template <typename T>
 inline constexpr in_place_type_t<T> in_place_type{};
 
+struct bad_any_cast : public std::bad_cast {
+  const char *what() const noexcept override {
+    return "bad any_cast";
+  }
+};
+
 class any {
   struct wrapper_base {
     virtual ~wrapper_base() = default;
     virtual std::unique_ptr<wrapper_base> clone() const = 0;
     virtual const std::type_info &get_typeid() const = 0;
   };
+
   template <typename ValueType>
   struct wrapper final : public wrapper_base {
-    static_cast(std::is_same_v<ValueType, std::decay_t<ValueType>>);
+    static_assert(std::is_same_v<ValueType, std::decay_t<ValueType>>);
 
     ValueType thing;
 
@@ -64,17 +77,41 @@ class any {
   template <typename ValueType, typename... Args>
     requires(std::is_constructible_v<std::decay_t<ValueType>, Args...> &&
              std::is_copy_constructible_v<std::decay_t<ValueType>>)
-  any(in_place_type_t<ValueType>, Args &&...args)
+  explicit any(in_place_type_t<ValueType>, Args &&...args)
       : pimpl(std::make_unique<wrapper<std::decay_t<ValueType>>>(
             std::forward<Args>(args)...)) {}
+
+  template <typename ValueType, typename U, typename... Args>
+    requires(std::is_constructible_v<std::decay_t<ValueType>,
+                                     std::initializer_list<U> &, Args...> &&
+             std::is_copy_constructible_v<std::decay_t<ValueType>>)
+  explicit any(in_place_type_t<ValueType>, std::initializer_list<U> il,
+               Args &&...args)
+      : pimpl(std::make_unique<wrapper<std::decay_t<ValueType>>>(
+            il, std::forward<Args>(args)...)) {}
 
   template <typename ValueType, typename... Args>
     requires(std::is_constructible_v<std::decay_t<ValueType>, Args...> &&
              std::is_copy_constructible_v<std::decay_t<ValueType>>)
   std::decay_t<ValueType> &emplace(Args &&...args) {
-    pimpl = std::make_unique<wrapper<std::decay_t<ValueType>>>(
+    auto ptr = std::make_unique<wrapper<std::decay_t<ValueType>>>(
         std::forward<Args>(args)...);
-    return *pimpl;
+    auto &ret = ptr->thing;
+    pimpl = std::move(ptr);
+    return ret;
+  }
+
+  template <typename ValueType, typename U, typename... Args>
+    requires(std::is_constructible_v<std::decay_t<ValueType>,
+                                     std::initializer_list<U> &, Args...> &&
+             std::is_copy_constructible_v<std::decay_t<ValueType>>)
+  std::decay_t<ValueType> &emplace(std::initializer_list<U> il,
+                                   Args &&...args) {
+    auto ptr = std::make_unique<wrapper<std::decay_t<ValueType>>>(
+        il, std::forward<Args>(args)...);
+    auto &ret = ptr->thing;
+    pimpl = std::move(ptr);
+    return ret;
   }
 
   void reset() noexcept {
@@ -95,26 +132,18 @@ class any {
  private:
   template <typename T>
   const T *get_raw_ptr() const noexcept {
-    return &static_cast<wrapper<T> *>(pimpl.get()).thing;
+    return &static_cast<wrapper<T> *>(pimpl.get())->thing;
   }
   template <typename T>
   T *get_raw_ptr() noexcept {
-    return &static_cast<wrapper<T> *>(pimpl.get()).thing;
+    return &static_cast<wrapper<T> *>(pimpl.get())->thing;
   }
 
   template <typename T>
-  friend const T *any_cast(const any *operand) noexcept {
-    if (operand && typeid(T) == operand->type())
-      return operand->get_raw_ptr<T>();
-    return nullptr;
-  }
+  friend const T *any_cast(const any *operand) noexcept;
 
   template <typename T>
-  friend T *any_cast(any *operand) noexcept {
-    if (operand && typeid(T) == operand->type())
-      return operand->get_raw_ptr<T>();
-    return nullptr;
-  }
+  friend T *any_cast(any *operand) noexcept;
 };
 
 template <typename T>
@@ -146,3 +175,21 @@ inline T any_cast(any &&operand) {
     throw bad_any_cast{};
   return static_cast<T>(std::move(*ptr));
 }
+
+template <typename T>
+inline const T *any_cast(const any *operand) noexcept {
+  if (operand && typeid(T) == operand->type())
+    return operand->get_raw_ptr<T>();
+  return nullptr;
+}
+
+template <typename T>
+inline T *any_cast(any *operand) noexcept {
+  if (operand && typeid(T) == operand->type())
+    return operand->get_raw_ptr<T>();
+  return nullptr;
+}
+
+} // namespace gkxx
+
+#endif // GKXX_ANY_HPP
