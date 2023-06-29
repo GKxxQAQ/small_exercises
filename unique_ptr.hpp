@@ -34,6 +34,10 @@ namespace detail {
 
 template <typename T, typename Deleter = default_delete<T>>
 class unique_ptr {
+  static_assert(!std::is_rvalue_reference_v<Deleter>,
+                "unique_ptr's deleter type must be a function object type"
+                " or an lvalue reference type");
+
   T *ptr{};
   Deleter deleter{};
 
