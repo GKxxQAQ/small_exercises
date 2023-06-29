@@ -13,12 +13,12 @@
 
 namespace gkxx {
 
-namespace detail {
+namespace detail::default_delete {
 
   template <typename T>
   concept complete_type = !std::is_void_v<T> && requires { sizeof(T); };
 
-} // namespace detail
+} // namespace detail::default_delete
 
 template <typename T>
 struct default_delete {
@@ -27,7 +27,7 @@ struct default_delete {
     requires std::convertible<U *, T *>
   CXX23_CONSTEXPR default_delete(const default_delete<U> &) noexcept {}
   CXX23_CONSTEXPR void operator()(T *ptr) const noexcept(noexcept(delete ptr)) {
-    static_assert(detail::complete_type<T>,
+    static_assert(detail::default_delete::complete_type<T>,
                   "delete a pointer to incomplete type");
     delete ptr;
   }
@@ -43,7 +43,7 @@ struct default_delete<T[]> {
     requires std::convertible<U (*)[], T (*)[]>
   CXX23_CONSTEXPR void operator()(U *ptr) const
       noexcept(noexcept(delete[] ptr)) {
-    static_assert(detail::complete_type<T>,
+    static_assert(detail::default_delete::complete_type<T>,
                   "delete a pointer to incomplete type");
     delete[] ptr;
   }
