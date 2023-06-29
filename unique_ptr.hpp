@@ -38,9 +38,6 @@ class unique_ptr {
                 "unique_ptr's deleter type must be a function object type"
                 " or an lvalue reference type");
 
-  T *ptr{};
-  Deleter deleter{};
-
   static inline constexpr auto deleter_is_lref =
       std::is_lvalue_reference_v<Deleter>;
   using unref_deleter = std::remove_reference_t<Deleter>;
@@ -50,6 +47,11 @@ class unique_ptr {
   using element_type = T;
   using deleter_type = Deleter;
 
+ private:
+  pointer ptr{};
+  Deleter deleter{};
+
+ public:
   // (1)
   constexpr unique_ptr() noexcept
     requires(detail::deleter_constraint<Deleter>)
