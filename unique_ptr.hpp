@@ -48,8 +48,7 @@ class unique_ptr {
   using deleter_type = Deleter;
 
  private:
-  pointer ptr{};
-  Deleter deleter{};
+  std::tuple<pointer, Deleter> m_data{};
 
  public:
   // (1)
@@ -59,27 +58,27 @@ class unique_ptr {
 
   constexpr unique_ptr(std::nullptr_t) noexcept
     requires(detail::deleter_constraint<Deleter>)
-  {}
+      : unique_ptr() {}
 
   // (2)
   CXX23_CONSTEXPR explicit unique_ptr(pointer p) noexcept
     requires(detail::deleter_constraint<Deleter>)
-      : ptr{p} {}
+      : m_data{p, Deleter{}} {}
 
   // (3) for non-reference Deleter
   CXX23_CONSTEXPR unique_ptr(pointer p, const Deleter &d) noexcept
     requires(!deleter_is_lref && std::is_constructible_v<Deleter, decltype(d)>)
-      : ptr{p}, deleter(d) {}
+      : m_data{p, d} {}
 
   // (4) for non-reference Deleter
   CXX23_CONSTEXPR unique_ptr(pointer p, Deleter &&d) noexcept
     requires(!deleter_is_lref && std::is_constructible_v<Deleter, decltype(d)>)
-      : ptr{p}, deleter(std::move(d)) {}
+      : m_data{p, std::move(d)} {}
 
   // (3) for Deleter as lvalue reference
   CXX23_CONSTEXPR unique_ptr(pointer p, Deleter d) noexcept
     requires(deleter_is_lref && std::is_constructible_v<Deleter, decltype(d)>)
-      : ptr{p}, deleter(d) {}
+      : m_data{p, d} {}
 
   // (4) for Deleter as lvalue reference
   CXX23_CONSTEXPR unique_ptr(pointer p, unref_deleter &&d)
@@ -89,13 +88,12 @@ class unique_ptr {
   // (5) for non-reference Deleter
   CXX23_CONSTEXPR unique_ptr(unique_ptr &&other) noexcept
     requires(!deleter_is_lref && std::is_move_constructible_v<Deleter>)
-      : ptr{std::exchange(other.ptr, nullptr)},
-        deleter(std::move(other.deleter)) {}
+      : m_data{other.release(), std::move(other.get_deleter())} {}
 
   // (5) for Deleter as lvalue reference
   CXX23_CONSTEXPR unique_ptr(unique_ptr &&other) noexcept
     requires(deleter_is_lref)
-      : ptr{std::exchange(other.ptr, nullptr)}, deleter(other.deleter) {}
+      : m_data{other.release(), other.get_deleter()} {}
 
   // (6)
   template <typename U, typename E>
@@ -104,8 +102,7 @@ class unique_ptr {
              !std::is_array_v<U> &&
              ((deleter_is_lref && std::is_same_v<Deleter, E>) ||
               !deleter_is_lref && std::convertible_to<E, Deleter>))
-      : ptr{std::exchange(other.ptr, nullptr)},
-        deleter(std::forward<E>(other.deleter)) {}
+      : m_data{other.release(), std::forward<E>(other.get_deleter())} {}
 
   CXX23_CONSTEXPR ~unique_ptr() {
     get_deleter()(get());
@@ -146,30 +143,28 @@ class unique_ptr {
   }
 
   CXX23_CONSTEXPR pointer release() noexcept {
-    return std::exchange(ptr, nullptr);
+    return std::exchange(std::get<0>(m_data), nullptr);
   }
 
   CXX23_CONSTEXPR void reset(pointer p = pointer()) noexcept {
-    auto old_ptr = std::exchange(ptr, p);
+    auto old_ptr = std::exchange(std::get<0>(m_data), p);
     if (old_ptr)
       get_deleter()(old_ptr);
   }
 
   void swap(unique_ptr &other) noexcept {
-    using std::swap;
-    swap(ptr, other.ptr);
-    swap(deleter, other.deleter);
+    m_data.swap(other.m_data);
   }
 
   CXX23_CONSTEXPR pointer get() const noexcept {
-    return ptr;
+    return std::get<0>(m_data);
   }
 
   CXX23_CONSTEXPR Deleter &get_deleter() noexcept {
-    return deleter;
+    return std::get<1>(m_data);
   }
   CXX23_CONSTEXPR const Deleter &get_deleter() const noexcept {
-    return deleter;
+    return std::get<1>(m_data);
   }
 
   CXX23_CONSTEXPR explicit operator bool() const noexcept {
