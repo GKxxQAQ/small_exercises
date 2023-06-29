@@ -3,10 +3,12 @@
 
 #include <concepts>
 
-#if __cplusplus > 202002L && !defined(CXX23_CONSTEXPR)
-#define CXX23_CONSTEXPR constexpr
-#else
-#define CXX23_CONSTEXPR
+#ifndef CXX23_CONSTEXPR
+# if __cplusplus > 202002L
+#  define CXX23_CONSTEXPR constexpr
+# else
+#  define CXX23_CONSTEXPR
+# endif
 #endif
 
 namespace gkxx {
