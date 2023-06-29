@@ -4,11 +4,11 @@
 #include <concepts>
 
 #ifndef CXX23_CONSTEXPR
-# if __cplusplus > 202002L
-#  define CXX23_CONSTEXPR constexpr
-# else
-#  define CXX23_CONSTEXPR
-# endif
+#if __cplusplus > 202002L
+#define CXX23_CONSTEXPR constexpr
+#else
+#define CXX23_CONSTEXPR
+#endif
 #endif
 
 namespace gkxx {
@@ -24,7 +24,7 @@ template <typename T>
 struct default_delete {
   constexpr default_delete() noexcept = default;
   template <typename U>
-  requires std::convertible<U *, T *>
+    requires std::convertible<U *, T *>
   CXX23_CONSTEXPR default_delete(const default_delete<U> &) noexcept {}
   CXX23_CONSTEXPR void operator()(T *ptr) const noexcept(noexcept(delete ptr)) {
     static_assert(detail::complete_type<T>,
@@ -37,11 +37,12 @@ template <typename T>
 struct default_delete<T[]> {
   constexpr default_delete() noexcept = default;
   template <typename U>
-  requires std::convertible<U(*)[], T(*)[]>
+    requires std::convertible<U (*)[], T (*)[]>
   CXX23_CONSTEXPR default_delete(const default_delete<U[]> &) noexcept {}
   template <typename U>
-  requires std::convertible<U(*)[], T(*)[]>
-  CXX23_CONSTEXPR void operator()(U *ptr) const noexcept(noexcept(delete[] ptr)) {
+    requires std::convertible<U (*)[], T (*)[]>
+  CXX23_CONSTEXPR void operator()(U *ptr) const
+      noexcept(noexcept(delete[] ptr)) {
     static_assert(detail::complete_type<T>,
                   "delete a pointer to incomplete type");
     delete[] ptr;
