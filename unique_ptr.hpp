@@ -154,7 +154,9 @@ class unique_ptr {
   }
 
   void swap(unique_ptr &other) noexcept {
-    m_data.swap(other.m_data);
+    using std::swap;
+    swap(m_ptr, other.m_ptr);
+    swap(m_deleter, other.m_deleter);
   }
 
   CXX23_CONSTEXPR pointer get() const noexcept {
