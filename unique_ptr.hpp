@@ -1,8 +1,6 @@
 #ifndef GKXX_UNIQUE_PTR_HPP
 #define GKXX_UNIQUE_PTR_HPP
 
-#include "default_delete.hpp"
-
 #include <compare>
 #include <concepts>
 #include <functional>
@@ -17,7 +15,51 @@
 #endif
 #endif
 
+#ifndef NO_UNIQUE_ADDRESS
+#ifdef _MSC_VER
+#define NO_UNIQUE_ADDRESS [[msvc::no_unique_address]]
+#else
+#define NO_UNIQUE_ADDRESS [[no_unique_address]]
+#endif
+#endif
+
 namespace gkxx {
+
+namespace detail {
+
+  template <typename T>
+  concept complete_type = !std::is_void_v<T> && requires { sizeof(T); };
+
+} // namespace detail
+
+template <typename T>
+struct default_delete {
+  constexpr default_delete() noexcept = default;
+  template <typename U>
+    requires std::convertible_to<U *, T *>
+  CXX23_CONSTEXPR default_delete(const default_delete<U> &) noexcept {}
+  CXX23_CONSTEXPR void operator()(T *ptr) const noexcept(noexcept(delete ptr)) {
+    static_assert(detail::complete_type<T>,
+                  "delete a pointer to incomplete type");
+    delete ptr;
+  }
+};
+
+template <typename T>
+struct default_delete<T[]> {
+  constexpr default_delete() noexcept = default;
+  template <typename U>
+    requires std::convertible_to<U (*)[], T (*)[]>
+  CXX23_CONSTEXPR default_delete(const default_delete<U[]> &) noexcept {}
+  template <typename U>
+    requires std::convertible_to<U (*)[], T (*)[]>
+  CXX23_CONSTEXPR void operator()(U *ptr) const
+      noexcept(noexcept(delete[] ptr)) {
+    static_assert(detail::complete_type<T>,
+                  "delete a pointer to incomplete type");
+    delete[] ptr;
+  }
+};
 
 namespace detail {
 
@@ -25,9 +67,11 @@ namespace detail {
   auto pointer_helper(int) -> typename std::remove_reference_t<D>::pointer;
   template <typename T, typename D>
   auto pointer_helper(...) -> T *;
+  template <typename T, typename D>
+  using unique_ptr_pointer_t = decltype(pointer_helper<T, D>(0));
 
   template <typename Deleter>
-  concept deleter_constraint =
+  concept default_constructible_functor =
       std::is_default_constructible_v<Deleter> && !std::is_pointer_v<Deleter>;
 
 } // namespace detail
@@ -43,27 +87,27 @@ class unique_ptr {
   using unref_deleter = std::remove_reference_t<Deleter>;
 
  public:
-  using pointer = decltype(detail::pointer_helper<T, Deleter>(0));
+  using pointer = detail::unique_ptr_pointer_t<T, Deleter>;
   using element_type = T;
   using deleter_type = Deleter;
 
  private:
   pointer m_ptr{};
-  [[no_unique_address]] Deleter m_deleter{};
+  NO_UNIQUE_ADDRESS Deleter m_deleter{};
 
  public:
   // (1)
   constexpr unique_ptr() noexcept
-    requires(detail::deleter_constraint<Deleter>)
+    requires(detail::default_constructible_functor<Deleter>)
   = default;
 
   constexpr unique_ptr(std::nullptr_t) noexcept
-    requires(detail::deleter_constraint<Deleter>)
+    requires(detail::default_constructible_functor<Deleter>)
       : unique_ptr() {}
 
   // (2)
   CXX23_CONSTEXPR explicit unique_ptr(pointer p) noexcept
-    requires(detail::deleter_constraint<Deleter>)
+    requires(detail::default_constructible_functor<Deleter>)
       : m_ptr(p) {}
 
   // (3) for non-reference Deleter
@@ -101,9 +145,10 @@ class unique_ptr {
   CXX23_CONSTEXPR unique_ptr(unique_ptr<U, E> &&other) noexcept
     requires(std::convertible_to<typename unique_ptr<U, E>::pointer, pointer> &&
              !std::is_array_v<U> &&
-             ((deleter_is_lref && std::is_same_v<Deleter, E>) ||
+             ((deleter_is_lref && std::same_as<Deleter, E>) ||
               !deleter_is_lref && std::convertible_to<E, Deleter>))
-      : m_ptr(other.release()), m_deleter(std::forward<E>(other.get_deleter())) {}
+      : m_ptr(other.release()),
+        m_deleter(std::forward<E>(other.get_deleter())) {}
 
   CXX23_CONSTEXPR ~unique_ptr() {
     get_deleter()(get());
