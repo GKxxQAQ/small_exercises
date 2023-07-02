@@ -595,6 +595,7 @@ struct hash<gkxx::unique_ptr<T, D>> {
 
 } // namespace std
 
+#undef NO_UNIQUE_ADDRESS
 #undef CXX23_CONSTEXPR
 
 #endif // GKXX_UNIQUE_PTR_HPP
