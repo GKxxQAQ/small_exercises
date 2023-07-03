@@ -63,15 +63,24 @@ struct default_delete<T[]> {
 
 namespace detail {
 
+  // template <typename T, typename D>
+  // struct unique_ptr_pointer {
+  //   using type = decltype([] {
+  //     if constexpr (requires { typename std::remove_reference_t<D>::pointer;
+  //     })
+  //       return typename std::remove_reference_t<D>::pointer{};
+  //     else
+  //       return static_cast<T *>(nullptr);
+  //   }());
+  // };
+
   template <typename T, typename D>
-  struct unique_ptr_pointer {
-    using type = decltype([] {
-      if constexpr (requires { typename std::remove_reference_t<D>::pointer; })
-        return typename std::remove_reference_t<D>::pointer{};
-      else
-        return static_cast<T *>(nullptr);
-    }());
-  };
+  using unique_ptr_pointer_t = decltype([] {
+    if constexpr (requires { typename std::remove_reference_t<D>::pointer; })
+      return typename std::remove_reference_t<D>::pointer{};
+    else
+      return static_cast<T *>(nullptr);
+  }());
 
   template <typename Deleter>
   concept default_constructible_functor =
@@ -86,7 +95,7 @@ class unique_ptr {
                 " or an lvalue reference type");
 
  public:
-  using pointer = typename detail::unique_ptr_pointer<T, Deleter>::type;
+  using pointer = detail::unique_ptr_pointer_t<T, Deleter>;
   using element_type = T;
   using deleter_type = Deleter;
 
@@ -246,7 +255,7 @@ class unique_ptr<T[], Deleter> {
                 "an lvalue reference type");
 
  public:
-  using pointer = typename detail::unique_ptr_pointer<T, Deleter>::type;
+  using pointer = detail::unique_ptr_pointer_t<T, Deleter>;
   using element_type = T;
   using deleter_type = Deleter;
 
