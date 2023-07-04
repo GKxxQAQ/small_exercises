@@ -63,28 +63,42 @@ struct default_delete<T[]> {
 
 namespace detail {
 
-  template <typename T, typename D>
-  using unique_ptr_pointer_t = decltype([] {
-    if constexpr (requires { typename std::remove_reference_t<D>::pointer; })
-      return typename std::remove_reference_t<D>::pointer{};
-    else
-      return static_cast<T *>(nullptr);
-  }());
+  template <typename D>
+  struct unique_ptr_deleter_traits {
+    static_assert(!std::is_rvalue_reference_v<D>,
+                  "unique_ptr's deleter type must be a function object type"
+                  " or an lvalue reference type");
 
-  template <typename Deleter>
-  concept default_constructible_functor =
-      std::is_default_constructible_v<Deleter> && !std::is_pointer_v<Deleter>;
+    static inline constexpr auto has_default =
+        std::is_default_constructible_v<D> && !std::is_pointer_v<D>;
+
+    static inline constexpr auto is_ref = std::is_reference_v<D>;
+
+    template <typename E>
+    static inline constexpr auto compatible =
+        (is_ref && std::same_as<D, E>) ||
+        (!is_ref && std::convertible_to<E, D>);
+  };
+
+  template <typename T, typename D>
+  struct unique_ptr_pointer_traits {
+    using pointer = decltype([] {
+      if constexpr (requires { typename std::remove_reference_t<D>::pointer; })
+        return typename std::remove_reference_t<D>::pointer{};
+      else
+        return static_cast<T *>(nullptr);
+    }());
+  };
 
 } // namespace detail
 
 template <typename T, typename Deleter = default_delete<T>>
 class unique_ptr {
-  static_assert(!std::is_rvalue_reference_v<Deleter>,
-                "unique_ptr's deleter type must be a function object type"
-                " or an lvalue reference type");
+  using dtr = detail::unique_ptr_deleter_traits<Deleter>;
+  using ptr = detail::unique_ptr_pointer_traits<T, Deleter>;
 
  public:
-  using pointer = detail::unique_ptr_pointer_t<T, Deleter>;
+  using pointer = typename ptr::pointer;
   using element_type = T;
   using deleter_type = Deleter;
 
@@ -92,66 +106,56 @@ class unique_ptr {
   pointer m_ptr;
   NO_UNIQUE_ADDRESS Deleter m_deleter;
 
-  template <typename D>
-  static inline constexpr auto deleter_compatible =
-      (std::is_reference_v<Deleter> && std::same_as<D, Deleter>) ||
-      (!std::is_reference_v<Deleter> && std::convertible_to<D, Deleter>);
-
  public:
   // (1)
   constexpr unique_ptr() noexcept
-    requires(detail::default_constructible_functor<Deleter>)
+    requires(dtr::has_default)
       : m_ptr(), m_deleter() {}
 
   constexpr unique_ptr(std::nullptr_t) noexcept
-    requires(detail::default_constructible_functor<Deleter>)
+    requires(dtr::has_default)
       : unique_ptr() {}
 
   // (2)
   CXX23_CONSTEXPR explicit unique_ptr(pointer p) noexcept
-    requires(detail::default_constructible_functor<Deleter>)
+    requires(dtr::has_default)
       : m_ptr(p), m_deleter() {}
 
   // (3) for non-reference Deleter
   CXX23_CONSTEXPR unique_ptr(pointer p, const Deleter &d) noexcept
-    requires(!std::is_reference_v<Deleter> &&
-             std::is_constructible_v<Deleter, decltype(d)>)
+    requires(!dtr::is_ref && std::is_constructible_v<Deleter, decltype(d)>)
       : m_ptr(p), m_deleter(d) {}
 
   // (4) for non-reference Deleter
   CXX23_CONSTEXPR unique_ptr(pointer p, Deleter &&d) noexcept
-    requires(!std::is_reference_v<Deleter> &&
-             std::is_constructible_v<Deleter, decltype(d)>)
+    requires(!dtr::is_ref && std::is_constructible_v<Deleter, decltype(d)>)
       : m_ptr(p), m_deleter(std::move(d)) {}
 
   // (3) for Deleter as lvalue reference
   CXX23_CONSTEXPR unique_ptr(pointer p, Deleter d) noexcept
-    requires(std::is_reference_v<Deleter> &&
-             std::is_constructible_v<Deleter, decltype(d)>)
+    requires(dtr::is_ref && std::is_constructible_v<Deleter, decltype(d)>)
       : m_ptr(p), m_deleter(d) {}
 
   // (4) for Deleter as lvalue reference
   CXX23_CONSTEXPR unique_ptr(pointer p, std::remove_reference_t<Deleter> &&d)
-    requires(std::is_reference_v<Deleter> &&
-             std::is_constructible_v<Deleter, decltype(d)>)
+    requires(dtr::is_ref && std::is_constructible_v<Deleter, decltype(d)>)
   = delete;
 
   // (5) for non-reference Deleter
   CXX23_CONSTEXPR unique_ptr(unique_ptr &&other) noexcept
-    requires(!std::is_reference_v<Deleter> &&
-             std::is_move_constructible_v<Deleter>)
+    requires(!dtr::is_ref && std::is_move_constructible_v<Deleter>)
       : m_ptr(other.release()), m_deleter(std::move(other.get_deleter())) {}
 
   // (5) for Deleter as lvalue reference
   CXX23_CONSTEXPR unique_ptr(unique_ptr &&other) noexcept
-    requires(std::is_reference_v<Deleter>)
+    requires(dtr::is_ref)
       : m_ptr(other.release()), m_deleter(other.get_deleter()) {}
 
   // (6)
   template <typename U, typename E>
   CXX23_CONSTEXPR unique_ptr(unique_ptr<U, E> &&other) noexcept
     requires(std::convertible_to<typename unique_ptr<U, E>::pointer, pointer> &&
-             !std::is_array_v<U> && deleter_compatible<E>)
+             !std::is_array_v<U> && dtr::template compatible<E>)
       : m_ptr(other.release()),
         m_deleter(std::forward<E>(other.get_deleter())) {}
 
@@ -237,103 +241,111 @@ class unique_ptr {
   unique_ptr &operator=(const unique_ptr &) = delete;
 };
 
+namespace detail {
+
+  template <typename T, typename D>
+  struct unique_ptr_pointer_traits<T[], D> {
+    using pointer = decltype([] {
+      if constexpr (requires { typename std::remove_reference_t<D>::pointer; })
+        return typename std::remove_reference_t<D>::pointer{};
+      else
+        return static_cast<T *>(nullptr);
+    }());
+
+    static inline constexpr auto ptr_elem_consistent =
+        std::same_as<pointer, T *>;
+
+    template <typename RawPtr>
+    static inline constexpr auto compatible =
+        ptr_elem_consistent &&
+        std::convertible_to<std::remove_pointer_t<RawPtr> (*)[], T (*)[]>;
+
+    template <>
+    static inline constexpr auto compatible<std::nullptr_t> = true;
+
+    template <typename U, typename E>
+    static inline constexpr auto compatible<unique_ptr<U, E>> =
+        std::is_array_v<U> && ptr_elem_consistent &&
+        std::same_as<typename unique_ptr<U, E>::pointer,
+                     typename unique_ptr<U, E>::element_type *> &&
+        std::convertible_to<typename unique_ptr<U, E>::element_type (*)[],
+                            T (*)[]>;
+  };
+} // namespace detail
+
 template <typename T, typename Deleter>
 class unique_ptr<T[], Deleter> {
-  static_assert(!std::is_rvalue_reference_v<Deleter>,
-                "unique_ptr's deleter type must be a function object type or "
-                "an lvalue reference type");
+  using dtr = detail::unique_ptr_deleter_traits<Deleter>;
+  using ptr = detail::unique_ptr_pointer_traits<T[], Deleter>;
 
  public:
-  using pointer = detail::unique_ptr_pointer_t<T, Deleter>;
+  using pointer = typename ptr::pointer;
   using element_type = T;
   using deleter_type = Deleter;
-
-  static inline constexpr auto ptr_elem_consistent =
-      std::same_as<pointer, element_type *>;
 
  private:
   pointer m_ptr;
   NO_UNIQUE_ADDRESS Deleter m_deleter;
 
-  template <typename RawPtr>
-  static inline constexpr auto array_compatible =
-      std::same_as<RawPtr, std::nullptr_t> ||
-      (ptr_elem_consistent &&
-       std::convertible_to<std::remove_pointer_t<RawPtr> (*)[],
-                           element_type (*)[]>);
-
-  template <typename U, typename E>
-  static inline constexpr auto array_compatible<unique_ptr<U, E>> =
-      std::is_array_v<U> && ptr_elem_consistent &&
-      unique_ptr<U, E>::ptr_elem_consistent &&
-      std::convertible_to<typename unique_ptr<U, E>::element_type (*)[],
-                          element_type (*)[]>;
-
-  template <typename D>
-  static inline constexpr auto deleter_compatible =
-      (std::is_reference_v<Deleter> && std::same_as<D, Deleter>) ||
-      (!std::is_reference_v<Deleter> && std::convertible_to<D, Deleter>);
-
  public:
   // (1)
   constexpr unique_ptr() noexcept
-    requires(detail::default_constructible_functor<Deleter>)
+    requires(dtr::has_default)
       : m_ptr(), m_deleter() {}
 
   constexpr unique_ptr(std::nullptr_t) noexcept
-    requires(detail::default_constructible_functor<Deleter>)
+    requires(dtr::has_default)
       : unique_ptr() {}
 
   // (2)
   template <typename Up>
   explicit unique_ptr(Up p) noexcept
-    requires(detail::default_constructible_functor<Deleter> &&
-             array_compatible<Up>)
+    requires(dtr::has_default && ptr::template compatible<Up>)
       : m_ptr(p), m_deleter() {}
 
   // (3) for non-reference Deleter
   template <typename Up>
   CXX23_CONSTEXPR unique_ptr(Up p, const Deleter &d) noexcept
-    requires(array_compatible<Up> && !std::is_reference_v<Deleter> &&
+    requires(ptr::template compatible<Up> && !dtr::is_ref &&
              std::constructible_from<Deleter, decltype(d)>)
       : m_ptr(p), m_deleter(d) {}
 
   // (4) for non-reference Deleter
   template <typename Up>
   CXX23_CONSTEXPR unique_ptr(Up p, Deleter &&d) noexcept
-    requires(array_compatible<Up> && !std::is_reference_v<Deleter> &&
+    requires(ptr::template compatible<Up> && !dtr::is_ref &&
              std::constructible_from<Deleter, decltype(d)>)
       : m_ptr(p), m_deleter(std::move(d)) {}
 
   // (3) for Deleter as lvalue reference
   template <typename Up>
   CXX23_CONSTEXPR unique_ptr(Up p, Deleter d) noexcept
-    requires(array_compatible<Up> && std::is_reference_v<Deleter> &&
+    requires(ptr::template compatible<Up> && dtr::is_ref &&
              std::constructible_from<Deleter, decltype(d)>)
       : m_ptr(p), m_deleter(d) {}
 
   // (4) for Deleter as lvalue reference
   template <typename Up>
   CXX23_CONSTEXPR unique_ptr(Up p, std::remove_reference_t<Deleter> &&d)
-    requires(array_compatible<Up> && std::is_reference_v<Deleter> &&
+    requires(ptr::template compatible<Up> && dtr::is_ref &&
              std::constructible_from<Deleter, decltype(d)>)
   = delete;
 
   // (5) for non-reference Deleter
   CXX23_CONSTEXPR unique_ptr(unique_ptr &&other) noexcept
-    requires(!std::is_reference_v<Deleter> &&
-             std::is_move_constructible_v<Deleter>)
+    requires(!dtr::is_ref && std::is_move_constructible_v<Deleter>)
       : m_ptr(other.release()), m_deleter(std::move(other.get_deleter())) {}
 
   // (5) for Deleter as lvalue reference
   CXX23_CONSTEXPR unique_ptr(unique_ptr &&other) noexcept
-    requires(std::is_reference_v<Deleter>)
+    requires(dtr::is_ref)
       : m_ptr(other.release()), m_deleter(other.get_deleter()) {}
 
   // (6)
   template <typename U, typename E>
   CXX23_CONSTEXPR unique_ptr(unique_ptr<U, E> &&other) noexcept
-    requires(array_compatible<unique_ptr<U, E>> && deleter_compatible<E>)
+    requires(ptr::template compatible<unique_ptr<U, E>> &&
+             dtr::template compatible<E>)
       : m_ptr(other.release()),
         m_deleter(std::forward<E>(other.get_deleter())) {}
 
@@ -361,7 +373,7 @@ class unique_ptr<T[], Deleter> {
   // (2) converting assignment operator
   template <typename U, typename E>
   CXX23_CONSTEXPR unique_ptr &operator=(unique_ptr &&other) noexcept
-    requires(array_compatible<unique_ptr<U, E>> &&
+    requires(ptr::template compatible<unique_ptr<U, E>> &&
              std::is_assignable_v<Deleter &, E &&>)
   {
     do_assign(std::move(other));
@@ -380,7 +392,7 @@ class unique_ptr<T[], Deleter> {
 
   template <typename Up>
   CXX23_CONSTEXPR void reset(Up p) noexcept
-    requires(std::same_as<Up, pointer> || array_compatible<Up>)
+    requires(std::same_as<Up, pointer> || ptr::template compatible<Up>)
   {
     if (auto old_ptr = std::exchange(m_ptr, p))
       get_deleter()(old_ptr);
