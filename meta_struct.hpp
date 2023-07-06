@@ -153,6 +153,7 @@ template <typename T>
 concept CMetaStruct_cvr =
     specialization_of<std::remove_cvref_t<T>, meta_struct>;
 
+// TODO: get for rvalue and cv-qualification
 template <string_literal Tag, CMetaStruct_cvr MS>
 inline constexpr decltype(auto) get(MS &&ms) {
   return detail::get_impl<Tag>(std::forward<MS>(ms));
