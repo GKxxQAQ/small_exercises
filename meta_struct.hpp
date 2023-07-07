@@ -40,7 +40,7 @@ struct tag_value_pair {
 };
 
 template <string_literal Tag>
-struct arg_t {
+struct initializer_t {
   template <typename T>
   constexpr auto operator=(T &&value) const {
     return tag_value_pair<Tag, T>{std::forward<T>(value)};
@@ -48,7 +48,12 @@ struct arg_t {
 };
 
 template <string_literal Tag>
-inline constexpr arg_t<Tag> arg{};
+inline constexpr initializer_t<Tag> init{};
+
+template <string_literal Tag>
+inline constexpr initializer_t<Tag> operator""_init() {
+  return {};
+}
 
 template <typename T>
 struct default_init {
@@ -62,7 +67,7 @@ struct required_t {
   explicit required_t() = default;
 
   template <typename T>
-  explicit operator T() const noexcept; // not defined
+  explicit operator T() const; // not defined
 
   template <string_literal Tag>
   static inline constexpr auto required_arg_specified = false;
@@ -82,10 +87,10 @@ struct member {
   template <typename... TVPs>
   constexpr member(auto &ms, param_pack<TVPs...> &&params)
       : value(try_init(ms, std::move(params))) {}
-  static constexpr auto tag() noexcept {
+  static constexpr auto tag() {
     return Tag;
   }
-  static constexpr auto init() noexcept {
+  static constexpr auto init() {
     return Init;
   }
   using element_type = T;

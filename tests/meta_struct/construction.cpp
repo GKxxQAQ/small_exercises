@@ -25,18 +25,18 @@ struct Test {
 };
 
 int main() {
-  Person p{arg<"id"> = 1, arg<"name"> = "John"};
+  Person p{init<"id"> = 1, init<"name"> = "John"};
   std::cout << get<"id">(p) << " " << get<"name">(p) << std::endl;
-  p = Person{arg<"name"> = "Alice", arg<"id"> = 2};
+  p = Person{"name"_init = "Alice", "id"_init = 2};
   std::cout << get<"id">(p) << " " << get<"name">(p) << std::endl;
 
   using CopyMoveTest = meta_struct<member<"a", Test &>, member<"b", Test>>;
   Test t1{};
   Test t2{};
 
-  CopyMoveTest cmt1{arg<"a"> = t1, arg<"b"> = t2};
+  CopyMoveTest cmt1{init<"a"> = t1, init<"b"> = t2};
   std::cout << "..." << std::endl;
-  CopyMoveTest cmt2{arg<"a"> = t1, arg<"b"> = Test{}};
+  CopyMoveTest cmt2{init<"a"> = t1, init<"b"> = Test{}};
 
   return 0;
 }
