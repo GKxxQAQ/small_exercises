@@ -27,20 +27,8 @@ struct tag_value_pair {
   T &&value;
 };
 
-namespace detail {
-
-  template <typename T>
-  inline constexpr auto is_tag_value_pair = false;
-  template <string_literal Tag, typename T>
-  inline constexpr auto is_tag_value_pair<tag_value_pair<Tag, T>> = true;
-
-} // namespace detail
-
-template <typename T>
-concept CTagValuePair_cvr = detail::is_tag_value_pair<std::remove_cvref_t<T>>;
-
 template <string_literal Tag>
-struct arg_type {
+struct arg_t {
   template <typename T>
   constexpr auto operator=(T &&value) const {
     return tag_value_pair<Tag, T>{std::forward<T>(value)};
@@ -48,7 +36,7 @@ struct arg_type {
 };
 
 template <string_literal Tag>
-inline constexpr arg_type<Tag> arg{};
+inline constexpr arg_t<Tag> arg{};
 
 template <typename T>
 struct default_init {
@@ -58,13 +46,30 @@ struct default_init {
   }
 };
 
+struct required_t {
+  explicit required_t() = default;
+  template <typename T>
+  explicit operator T() const noexcept; // not defined
+};
+
+inline constexpr required_t required{};
+
+template <typename... TVPs>
+struct param_pack : TVPs... {};
+
+template <typename... TVPs>
+param_pack(TVPs &&...) -> param_pack<std::remove_reference_t<TVPs>...>;
+
+template <string_literal Tag>
+inline constexpr auto required_arg_specified = false;
+
 template <string_literal Tag, typename T, auto Init = default_init<T>{}>
 struct member {
-  template <typename OtherT>
-  constexpr member(tag_value_pair<Tag, OtherT> tvp)
-      : value(std::forward<OtherT>(tvp.value)) {}
   template <typename MS>
   constexpr member(MS &ms) : value(call_init(ms)) {}
+  template <typename MS, typename... TVPs>
+  constexpr member(MS &ms, param_pack<TVPs...> &&params)
+      : value(try_init(ms, std::move(params))) {}
   static constexpr auto tag() noexcept {
     return Tag;
   }
@@ -75,68 +80,64 @@ struct member {
   T value;
 
  private:
-  template <typename MS>
-  static constexpr decltype(auto) call_init(MS &)
+  static constexpr decltype(auto) call_init(auto &)
     requires requires {
       { Init() } -> std::convertible_to<T>;
     }
   {
     return Init();
   }
-  template <typename MS>
-  static constexpr decltype(auto) call_init(MS &ms)
+  static constexpr decltype(auto) call_init(auto &ms)
     requires requires {
       { Init(ms) } -> std::convertible_to<T>;
     }
   {
     return Init(ms);
   }
+  static constexpr decltype(auto) call_init(auto &)
+    requires std::same_as<std::remove_cvref_t<decltype(Init)>, required_t>
+  {
+    static_assert(required_arg_specified<Tag>,
+                  "required argument not specified");
+    return required_t{};
+  }
+
+  template <typename MS, typename OtherT>
+  constexpr decltype(auto) try_init(MS &,
+                                    tag_value_pair<Tag, OtherT> tvp) const {
+    return std::forward<OtherT>(tvp.value);
+  }
+  template <typename MS>
+  constexpr decltype(auto) try_init(MS &ms, ...) const {
+    return call_init(ms);
+  }
 };
 
-namespace detail {
-
-  template <typename T>
-  inline constexpr auto is_member = false;
-  template <string_literal Tag, typename T, auto Init>
-  inline constexpr auto is_member<member<Tag, T, Init>> = true;
-
-} // namespace detail
-
-template <typename T>
-concept CMember = detail::is_member<T>;
-
-template <CTagValuePair_cvr... TVPs>
-struct param_pack : TVPs... {};
-
-template <CTagValuePair_cvr... TVPs>
-param_pack(TVPs &&...) -> param_pack<TVPs...>;
-
-template <typename T>
-concept CParamPack_cvr = specialization_of<std::remove_cvref_t<T>, param_pack>;
-
-template <CMember... Members>
+template <typename... Members>
 struct meta_struct;
 
 namespace detail {
 
-  template <CMember... Members>
+  template <typename... Members>
   struct meta_struct_impl : Members... {
-    template <CParamPack_cvr Params>
-    constexpr meta_struct_impl(Params &&p) : Members(std::move(p))... {}
+    template <typename... TVPs>
+    constexpr meta_struct_impl(meta_struct<Members...> &ms,
+                               param_pack<TVPs...> &&p)
+        : Members(ms, std::move(p))... {}
     constexpr meta_struct_impl(meta_struct<Members...> &ms) : Members(ms)... {}
   };
 
 } // namespace detail
 
-template <CMember... Members>
+template <typename... Members>
 struct meta_struct : detail::meta_struct_impl<Members...> {
  private:
   using super = detail::meta_struct_impl<Members...>;
 
  public:
-  template <CTagValuePair_cvr... TVPs>
+  template <typename... TVPs>
   constexpr meta_struct(TVPs &&...tvps)
-      : super(param_pack{std::move(tvps)...}) {}
+      : super(*this, param_pack{std::move(tvps)...}) {}
   constexpr meta_struct() : super(*this) {}
 };
 
