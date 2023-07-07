@@ -5,6 +5,7 @@
 #include <compare>
 #include <concepts>
 #include <string>
+#include <string_view>
 
 #include "is_specialization_of.hpp"
 
@@ -16,6 +17,9 @@ struct string_literal {
     std::copy_n(str, N + 1, data);
   }
   auto operator<=>(const string_literal &) const = default;
+  constexpr std::string_view sv() const {
+    return {data, N};
+  }
   char data[N + 1]{};
 };
 
@@ -48,8 +52,12 @@ struct default_init {
 
 struct required_t {
   explicit required_t() = default;
+
   template <typename T>
   explicit operator T() const noexcept; // not defined
+
+  template <string_literal Tag>
+  static inline constexpr auto required_arg_specified = false;
 };
 
 inline constexpr required_t required{};
@@ -59,9 +67,6 @@ struct param_pack : TVPs... {};
 
 template <typename... TVPs>
 param_pack(TVPs &&...) -> param_pack<std::remove_reference_t<TVPs>...>;
-
-template <string_literal Tag>
-inline constexpr auto required_arg_specified = false;
 
 template <string_literal Tag, typename T, auto Init = default_init<T>{}>
 struct member {
@@ -97,7 +102,7 @@ struct member {
   static constexpr decltype(auto) call_init(auto &)
     requires std::same_as<std::remove_cvref_t<decltype(Init)>, required_t>
   {
-    static_assert(required_arg_specified<Tag>,
+    static_assert(required_t::required_arg_specified<Tag>,
                   "required argument not specified");
     return required_t{};
   }
