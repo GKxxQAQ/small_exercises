@@ -70,10 +70,9 @@ param_pack(TVPs &&...) -> param_pack<std::remove_reference_t<TVPs>...>;
 
 template <string_literal Tag, typename T, auto Init = default_init<T>{}>
 struct member {
-  template <typename MS>
-  constexpr member(MS &ms) : value(call_init(ms)) {}
-  template <typename MS, typename... TVPs>
-  constexpr member(MS &ms, param_pack<TVPs...> &&params)
+  constexpr member(auto &ms) : value(call_init(ms)) {}
+  template <typename... TVPs>
+  constexpr member(auto &ms, param_pack<TVPs...> &&params)
       : value(try_init(ms, std::move(params))) {}
   static constexpr auto tag() noexcept {
     return Tag;
@@ -107,13 +106,12 @@ struct member {
     return required_t{};
   }
 
-  template <typename MS, typename OtherT>
-  constexpr decltype(auto) try_init(MS &,
-                                    tag_value_pair<Tag, OtherT> tvp) const {
+  template <typename OtherT>
+  static constexpr decltype(auto)
+  try_init(auto &, tag_value_pair<Tag, OtherT> tvp) {
     return std::forward<OtherT>(tvp.value);
   }
-  template <typename MS>
-  constexpr decltype(auto) try_init(MS &ms, ...) const {
+  static constexpr decltype(auto) try_init(auto &ms, ...) {
     return call_init(ms);
   }
 };
@@ -140,9 +138,8 @@ struct meta_struct : detail::meta_struct_impl<Members...> {
   using super = detail::meta_struct_impl<Members...>;
 
  public:
-  template <typename... TVPs>
-  constexpr meta_struct(TVPs &&...tvps)
-      : super(*this, param_pack{std::move(tvps)...}) {}
+  constexpr meta_struct(auto &&...tvpairs)
+      : super(*this, param_pack{std::move(tvpairs)...}) {}
   constexpr meta_struct() : super(*this) {}
 };
 
@@ -168,13 +165,32 @@ namespace detail {
     return std::move(m.value);
   }
 
+  template <string_literal Tag, typename T, auto Init>
+  inline constexpr volatile T &get_impl(volatile member<Tag, T, Init> &m) {
+    return m.value;
+  }
+
+  template <string_literal Tag, typename T, auto Init>
+  inline constexpr volatile T &&get_impl(volatile member<Tag, T, Init> &&m) {
+    return std::move(m.value);
+  }
+
+  template <string_literal Tag, typename T, auto Init>
+  inline constexpr const volatile T &
+  get_impl(const volatile member<Tag, T, Init> &m) {
+    return m.value;
+  }
+
+  template <string_literal Tag, typename T, auto Init>
+  inline constexpr const volatile T &&
+  get_impl(const volatile member<Tag, T, Init> &&m) {
+    return std::move(m.value);
+  }
+
 } // namespace detail
 
-template <typename T>
-concept CMetaStruct_cvr =
-    specialization_of<std::remove_cvref_t<T>, meta_struct>;
-
-template <string_literal Tag, CMetaStruct_cvr MS>
+template <string_literal Tag, typename MS>
+  requires specialization_of<std::remove_cvref_t<MS>, meta_struct>
 inline constexpr decltype(auto) get(MS &&ms) {
   return detail::get_impl<Tag>(std::forward<MS>(ms));
 }
