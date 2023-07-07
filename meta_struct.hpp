@@ -149,8 +149,23 @@ struct meta_struct : detail::meta_struct_impl<Members...> {
 namespace detail {
 
   template <string_literal Tag, typename T, auto Init>
-  inline constexpr decltype(auto) get_impl(member<Tag, T, Init> &m) {
-    return (m.value);
+  inline constexpr T &get_impl(member<Tag, T, Init> &m) {
+    return m.value;
+  }
+
+  template <string_literal Tag, typename T, auto Init>
+  inline constexpr T &&get_impl(member<Tag, T, Init> &&m) {
+    return std::move(m.value);
+  }
+
+  template <string_literal Tag, typename T, auto Init>
+  inline constexpr const T &get_impl(const member<Tag, T, Init> &m) {
+    return m.value;
+  }
+
+  template <string_literal Tag, typename T, auto Init>
+  inline constexpr const T &&get_impl(const member<Tag, T, Init> &&m) {
+    return std::move(m.value);
   }
 
 } // namespace detail
@@ -159,7 +174,6 @@ template <typename T>
 concept CMetaStruct_cvr =
     specialization_of<std::remove_cvref_t<T>, meta_struct>;
 
-// TODO: get for rvalue and cv-qualification
 template <string_literal Tag, CMetaStruct_cvr MS>
 inline constexpr decltype(auto) get(MS &&ms) {
   return detail::get_impl<Tag>(std::forward<MS>(ms));
