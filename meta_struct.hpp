@@ -17,7 +17,8 @@ struct string_literal {
     std::copy_n(str, N + 1, data);
   }
   auto operator<=>(const string_literal &) const = default;
-  constexpr std::string_view sv() const {
+  bool operator==(const string_literal &) const = default;
+  constexpr std::string_view as_sv() const {
     return {data, N};
   }
   char data[N + 1]{};
@@ -25,6 +26,13 @@ struct string_literal {
 
 template <std::size_t N>
 string_literal(const char (&)[N]) -> string_literal<N - 1>;
+
+template <std::size_t N, std::size_t M>
+  requires(N != M)
+inline constexpr bool operator==(const string_literal<N> &,
+                                 const string_literal<M> &) {
+  return false;
+}
 
 template <string_literal Tag, typename T>
 struct tag_value_pair {
@@ -107,8 +115,8 @@ struct member {
   }
 
   template <typename OtherT>
-  static constexpr decltype(auto)
-  try_init(auto &, tag_value_pair<Tag, OtherT> tvp) {
+  static constexpr decltype(auto) try_init(auto &,
+                                           tag_value_pair<Tag, OtherT> tvp) {
     return std::forward<OtherT>(tvp.value);
   }
   static constexpr decltype(auto) try_init(auto &ms, ...) {
@@ -132,6 +140,41 @@ namespace detail {
 
 } // namespace detail
 
+template <string_literal... Tags>
+struct tag_list {
+  template <template <typename...> typename Container>
+  static constexpr Container<std::string_view> as_container() {
+    return {Tags.as_sv()...};
+  }
+  template <string_literal S>
+  static inline constexpr auto contains = (... || (Tags == S));
+};
+
+template <typename... Types>
+struct type_list {
+  template <typename Func>
+  static constexpr void apply(Func &&func) {
+    [[maybe_unused]] int _[] = {
+        (std::forward<Func>(func)(static_cast<Types *>(nullptr)), 0)...};
+  }
+  template <typename T>
+  static inline constexpr auto contains = (... || std::is_same_v<Types, T>);
+};
+
+template <typename... Members>
+struct member_list : type_list<Members...> {
+  using type_list<Members...>::apply;
+  using tags = tag_list<Members::tag()...>;
+  using element_types = type_list<typename Members::element_type...>;
+
+  template <string_literal S>
+  static inline constexpr auto contains_tag = tags::template contains<S>;
+
+  template <typename T>
+  static inline constexpr auto contains_element =
+      element_types::template contains<T>;
+};
+
 template <typename... Members>
 struct meta_struct : detail::meta_struct_impl<Members...> {
  private:
@@ -141,6 +184,8 @@ struct meta_struct : detail::meta_struct_impl<Members...> {
   constexpr meta_struct(auto &&...tvpairs)
       : super(*this, param_pack{std::move(tvpairs)...}) {}
   constexpr meta_struct() : super(*this) {}
+
+  using members = member_list<Members...>;
 };
 
 namespace detail {
