@@ -8,16 +8,16 @@
 #include <string_view>
 
 #include "is_specialization_of.hpp"
-#include "string_literal.hpp"
+#include "fixed_string.hpp"
 
 namespace gkxx::meta_struct {
 
-template <string_literal Tag, typename T>
+template <fixed_string Tag, typename T>
 struct tag_value_pair {
   T &&value;
 };
 
-template <string_literal Tag>
+template <fixed_string Tag>
 struct initializer_t {
   template <typename T>
   constexpr auto operator=(T &&value) const {
@@ -25,10 +25,10 @@ struct initializer_t {
   }
 };
 
-template <string_literal Tag>
+template <fixed_string Tag>
 inline constexpr initializer_t<Tag> init{};
 
-template <string_literal Tag>
+template <fixed_string Tag>
 inline constexpr initializer_t<Tag> operator""_init() {
   return {};
 }
@@ -47,7 +47,7 @@ struct required_t {
   template <typename T>
   explicit operator T() const; // not defined
 
-  template <string_literal Tag>
+  template <fixed_string Tag>
   static inline constexpr auto required_arg_specified = false;
 };
 
@@ -59,7 +59,7 @@ struct param_pack : TVPs... {};
 template <typename... TVPs>
 param_pack(TVPs &&...) -> param_pack<std::remove_reference_t<TVPs>...>;
 
-template <string_literal Tag, typename T, auto Init = default_init<T>{}>
+template <fixed_string Tag, typename T, auto Init = default_init<T>{}>
 struct member {
   constexpr member(auto &ms) : value(call_init(ms)) {}
   template <typename... TVPs>
@@ -123,13 +123,13 @@ namespace detail {
 
 } // namespace detail
 
-template <string_literal... Tags>
+template <fixed_string... Tags>
 struct tag_list {
   template <template <typename...> typename Container>
   static constexpr Container<std::string_view> as_container() {
     return {Tags.as_sv()...};
   }
-  template <string_literal S>
+  template <fixed_string S>
   static inline constexpr auto contains = (... || (Tags == S));
 };
 
@@ -150,7 +150,7 @@ struct member_list : type_list<Members...> {
   using tags = tag_list<Members::tag()...>;
   using element_types = type_list<typename Members::element_type...>;
 
-  template <string_literal S>
+  template <fixed_string S>
   static inline constexpr auto contains_tag = tags::template contains<S>;
 
   template <typename T>
@@ -173,43 +173,43 @@ struct meta_struct : detail::meta_struct_impl<Members...> {
 
 namespace detail {
 
-  template <string_literal Tag, typename T, auto Init>
+  template <fixed_string Tag, typename T, auto Init>
   inline constexpr T &get_impl(member<Tag, T, Init> &m) {
     return m.value;
   }
 
-  template <string_literal Tag, typename T, auto Init>
+  template <fixed_string Tag, typename T, auto Init>
   inline constexpr T &&get_impl(member<Tag, T, Init> &&m) {
     return std::move(m.value);
   }
 
-  template <string_literal Tag, typename T, auto Init>
+  template <fixed_string Tag, typename T, auto Init>
   inline constexpr const T &get_impl(const member<Tag, T, Init> &m) {
     return m.value;
   }
 
-  template <string_literal Tag, typename T, auto Init>
+  template <fixed_string Tag, typename T, auto Init>
   inline constexpr const T &&get_impl(const member<Tag, T, Init> &&m) {
     return std::move(m.value);
   }
 
-  template <string_literal Tag, typename T, auto Init>
+  template <fixed_string Tag, typename T, auto Init>
   inline constexpr volatile T &get_impl(volatile member<Tag, T, Init> &m) {
     return m.value;
   }
 
-  template <string_literal Tag, typename T, auto Init>
+  template <fixed_string Tag, typename T, auto Init>
   inline constexpr volatile T &&get_impl(volatile member<Tag, T, Init> &&m) {
     return std::move(m.value);
   }
 
-  template <string_literal Tag, typename T, auto Init>
+  template <fixed_string Tag, typename T, auto Init>
   inline constexpr const volatile T &
   get_impl(const volatile member<Tag, T, Init> &m) {
     return m.value;
   }
 
-  template <string_literal Tag, typename T, auto Init>
+  template <fixed_string Tag, typename T, auto Init>
   inline constexpr const volatile T &&
   get_impl(const volatile member<Tag, T, Init> &&m) {
     return std::move(m.value);
@@ -217,7 +217,7 @@ namespace detail {
 
 } // namespace detail
 
-template <string_literal Tag, typename MS>
+template <fixed_string Tag, typename MS>
   requires specialization_of<std::remove_cvref_t<MS>, meta_struct>
 inline constexpr decltype(auto) get(MS &&ms) {
   return detail::get_impl<Tag>(std::forward<MS>(ms));

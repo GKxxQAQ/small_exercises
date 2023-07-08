@@ -6,16 +6,16 @@
 
 namespace gkxx {
 
-/// @brief Compile-time string literal, enabling the use of string literals as
+/// @brief Compile-time fixed string, enabling the use of string literals as
 /// template parameters and user-literals
 /// @tparam N The length of the string
 template <std::size_t N>
-struct string_literal {
-  constexpr string_literal(const char (&str)[N + 1]) {
+struct fixed_string {
+  constexpr fixed_string(const char (&str)[N + 1]) {
     std::copy_n(str, N + 1, data);
   }
-  auto operator<=>(const string_literal &) const = default;
-  bool operator==(const string_literal &) const = default;
+  auto operator<=>(const fixed_string &) const = default;
+  bool operator==(const fixed_string &) const = default;
   constexpr std::string_view as_sv() const {
     return {data, N};
   }
@@ -23,12 +23,12 @@ struct string_literal {
 };
 
 template <std::size_t N>
-string_literal(const char (&)[N]) -> string_literal<N - 1>;
+fixed_string(const char (&)[N]) -> fixed_string<N - 1>;
 
 template <std::size_t N, std::size_t M>
   requires(N != M)
-inline constexpr bool operator==(const string_literal<N> &,
-                                 const string_literal<M> &) {
+inline constexpr bool operator==(const fixed_string<N> &,
+                                 const fixed_string<M> &) {
   return false;
 }
 
