@@ -6,7 +6,7 @@
 #include <utility>
 
 int main() {
-  using namespace gkxx;
+  using namespace gkxx::meta_struct;
   using Person = meta_struct<
       member<"id", int>,
       member<"score", int, [](auto &self) { return get<"id">(self) + 1; }>,

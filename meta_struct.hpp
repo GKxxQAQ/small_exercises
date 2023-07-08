@@ -9,7 +9,7 @@
 
 #include "is_specialization_of.hpp"
 
-namespace gkxx {
+namespace gkxx::meta_struct {
 
 template <std::size_t N>
 struct string_literal {

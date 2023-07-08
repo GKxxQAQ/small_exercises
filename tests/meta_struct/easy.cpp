@@ -4,7 +4,7 @@
 #include <iostream>
 
 int main() {
-  using namespace gkxx;
+  using namespace gkxx::meta_struct;
   using Person = meta_struct<member<"id", int>, member<"name", std::string>>;
   Person p;
   get<"id">(p) = 1;

@@ -3,7 +3,7 @@
 #include <iostream>
 #include <string>
 
-using namespace gkxx;
+using namespace gkxx::meta_struct;
 
 using Person = meta_struct<
     member<"id", int>,
