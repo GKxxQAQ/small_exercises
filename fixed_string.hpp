@@ -3,6 +3,7 @@
 
 #include <compare>
 #include <string_view>
+#include <algorithm>
 
 namespace gkxx {
 
