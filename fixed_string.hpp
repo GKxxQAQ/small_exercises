@@ -1,8 +1,8 @@
 #ifndef GKXX_STRING_LITERAL_HPP
 #define GKXX_STRING_LITERAL_HPP
 
-#include <string_view>
 #include <compare>
+#include <string_view>
 
 namespace gkxx {
 
@@ -16,8 +16,11 @@ struct fixed_string {
   }
   auto operator<=>(const fixed_string &) const = default;
   bool operator==(const fixed_string &) const = default;
-  constexpr std::string_view as_sv() const {
+  constexpr std::string_view as_sv() const noexcept {
     return {data, N};
+  }
+  static constexpr auto size() noexcept {
+    return N;
   }
   char data[N + 1]{};
 };
