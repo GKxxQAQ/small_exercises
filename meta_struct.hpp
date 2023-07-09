@@ -7,8 +7,8 @@
 #include <string>
 #include <string_view>
 
-#include "is_specialization_of.hpp"
 #include "fixed_string.hpp"
+#include "is_specialization_of.hpp"
 
 namespace gkxx::meta_struct {
 
@@ -136,6 +136,7 @@ struct tag_list {
 template <typename... Types>
 struct type_list {
   template <typename Func>
+    requires(... && std::invocable<Func, Types *>)
   static constexpr void apply(Func &&func) {
     [[maybe_unused]] int _[] = {
         (std::forward<Func>(func)(static_cast<Types *>(nullptr)), 0)...};
@@ -223,6 +224,6 @@ inline constexpr decltype(auto) get(MS &&ms) {
   return detail::get_impl<Tag>(std::forward<MS>(ms));
 }
 
-} // namespace gkxx
+} // namespace gkxx::meta_struct
 
 #endif // GKXX_META_STRUCT_HPP
