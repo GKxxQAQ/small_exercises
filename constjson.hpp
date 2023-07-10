@@ -205,15 +205,10 @@ namespace tokenizer {
         return result_t<Null, Pos + 4>{};
     }
 
-    template <std::size_t Cur>
     struct string_matcher {};
 
-    template <bool Neg>
     struct integer_matcher {
-
-    };
-    template <> // Negative
-    struct integer_matcher<true> {
+      
     };
 
    public:
@@ -227,10 +222,9 @@ namespace tokenizer {
         meta::case_<'t', decltype(match_true())>,
         meta::case_<'f', decltype(match_false())>,
         meta::case_<'n', decltype(match_null())>,
-        meta::case_<'"', string_matcher::result>,
-        meta::case_<'-', integer_matcher<true>::result>,
-        meta::case_if<[](char c) { return c >= '0' && c <= '9'; },
-                      integer_matcher<false>::result>,
+        meta::case_<'"', typename string_matcher::result>,
+        meta::case_if<[](char c) { return c == '-' || (c >= '0' && c <= '9'); },
+                      typename integer_matcher::result>,
         meta::default_<result_t<ErrorToken<"Unrecognized token">, Pos>>>::type;
   };
 
