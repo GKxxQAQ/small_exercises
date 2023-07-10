@@ -219,7 +219,7 @@ namespace detail {
 } // namespace detail
 
 template <fixed_string Tag, typename MS>
-  requires specialization_of<std::remove_cvref_t<MS>, meta_struct>
+  requires meta::specialization_of<std::remove_cvref_t<MS>, meta_struct>
 inline constexpr decltype(auto) get(MS &&ms) {
   return detail::get_impl<Tag>(std::forward<MS>(ms));
 }

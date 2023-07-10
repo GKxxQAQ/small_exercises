@@ -1,6 +1,6 @@
 #include "../../switch_case.hpp"
 
-using namespace gkxx;
+using namespace gkxx::meta;
 
 template <int N>
 struct Foo {

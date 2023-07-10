@@ -3,7 +3,7 @@
 
 #include <type_traits>
 
-namespace gkxx {
+namespace gkxx::meta {
 
 template <auto Label, typename Result>
 struct case_ {
@@ -61,6 +61,6 @@ struct switch_<Expr, First, Rest...> {
   }())::type;
 };
 
-} // namespace gkxx
+} // namespace gkxx::meta
 
 #endif // GKXX_SWITCH_CASE_HPP
