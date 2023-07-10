@@ -1,15 +1,21 @@
 #ifndef GKXX_SWITCH_CASE_HPP
 #define GKXX_SWITCH_CASE_HPP
 
-#include <type_traits>
+#include <concepts>
 
 namespace gkxx::meta {
 
 template <auto Label, typename Result>
 struct case_ {
-  using label_type = decltype(Label);
   template <auto Expr>
   static constexpr auto match = (Expr == Label);
+  using result = Result;
+};
+
+template <auto Pred, typename Result>
+struct case_if {
+  template <auto Expr>
+  static constexpr auto match = Pred(Expr);
   using result = Result;
 };
 
@@ -19,6 +25,8 @@ namespace detail {
   inline constexpr auto is_case_ = false;
   template <auto L, typename R>
   inline constexpr auto is_case_<case_<L, R>> = true;
+  template <auto Pred, typename R>
+  inline constexpr auto is_case_<case_if<Pred, R>> = true;
 
   struct default_label_t {
     explicit default_label_t() = default;
