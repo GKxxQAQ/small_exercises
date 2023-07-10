@@ -4,6 +4,7 @@
 #include <concepts>
 
 #include "fixed_string.hpp"
+#include "switch_case.hpp"
 
 /*
 Tokens:
@@ -175,7 +176,7 @@ namespace tokenizer {
     static_assert(!is_whitespace(Src[Pos]),
                   "token_getter encounters a whitespace");
     template <CToken Token, std::size_t EndPos>
-    struct result_wrapper {
+    struct result_t {
       using token = Token;
       static constexpr auto end_pos = EndPos;
     };
@@ -184,58 +185,53 @@ namespace tokenizer {
     static constexpr auto match_true() noexcept {
       if constexpr (Pos + 3 < Src.size() && Src[Pos + 1] == 'r' &&
                     Src[Pos + 2] == 'u' && Src[Pos + 3] == 'e')
-        return result_wrapper<ErrorToken<"expected 'true'">, Pos>{};
+        return result_t<ErrorToken<"expected 'true'">, Pos>{};
       else
-        return result_wrapper<True, Pos + 4>{};
+        return result_t<True, Pos + 4>{};
     }
     static constexpr auto match_false() noexcept {
       if constexpr (Pos + 4 < Src.size() && Src[Pos + 1] == 'a' &&
                     Src[Pos + 2] == 'l' && Src[Pos + 3] == 's' &&
                     Src[Pos + 4] == 'e')
-        return result_wrapper<ErrorToken<"expected 'false'">, Pos>{};
+        return result_t<ErrorToken<"expected 'false'">, Pos>{};
       else
-        return result_wrapper<False, Pos + 5>{};
+        return result_t<False, Pos + 5>{};
     }
     static constexpr auto match_null() noexcept {
       if constexpr (Pos + 3 < Src.size() && Src[Pos + 1] == 'u' &&
                     Src[Pos + 2] == 'l' && Src[Pos + 3] == 'l')
-        return result_wrapper<ErrorToken<"expected 'null'">, Pos>{};
+        return result_t<ErrorToken<"expected 'null'">, Pos>{};
       else
-        return result_wrapper<Null, Pos + 4>{};
-    }
-    static constexpr auto match_string() noexcept {
-      // TODO: match_string
-    }
-    static constexpr auto match_integer() noexcept {
-      // TODO: match_integer
-    }
-    static constexpr auto get() noexcept {
-      if constexpr (Src[Pos] == '{')
-        return result_wrapper<LBrace, Pos + 1>{};
-      else if constexpr (Src[Pos] == '}')
-        return result_wrapper<RBrace, Pos + 1>{};
-      else if constexpr (Src[Pos] == '[')
-        return result_wrapper<LBracket, Pos + 1>{};
-      else if constexpr (Src[Pos] == ']')
-        return result_wrapper<RBracket, Pos + 1>{};
-      else if constexpr (Src[Pos] == ',')
-        return result_wrapper<Comma, Pos + 1>{};
-      else if constexpr (Src[Pos] == ':')
-        return result_wrapper<Colon, Pos + 1>{};
-      else if constexpr (Src[Pos] == 't')
-        return match_true();
-      else if constexpr (Src[Pos] == 'f')
-        return match_false();
-      else if constexpr (Src[Pos] == 'n')
-        return match_null();
-      else if constexpr (Src[Pos] == '"')
-        return match_string();
-      else
-        return match_integer();
+        return result_t<Null, Pos + 4>{};
     }
 
+    template <std::size_t Cur>
+    struct string_matcher {};
+
+    template <bool Neg>
+    struct integer_matcher {
+
+    };
+    template <> // Negative
+    struct integer_matcher<true> {
+    };
+
    public:
-    using result = decltype(get());
+    using result = typename meta::switch_<
+        Src[Pos], meta::case_<'{', result_t<LBrace, Pos + 1>>,
+        meta::case_<'}', result_t<RBrace, Pos + 1>>,
+        meta::case_<'[', result_t<LBracket, Pos + 1>>,
+        meta::case_<']', result_t<RBracket, Pos + 1>>,
+        meta::case_<',', result_t<Comma, Pos + 1>>,
+        meta::case_<':', result_t<Colon, Pos + 1>>,
+        meta::case_<'t', decltype(match_true())>,
+        meta::case_<'f', decltype(match_false())>,
+        meta::case_<'n', decltype(match_null())>,
+        meta::case_<'"', string_matcher::result>,
+        meta::case_<'-', integer_matcher<true>::result>,
+        meta::case_if<[](char c) { return c >= '0' && c <= '9'; },
+                      integer_matcher<false>::result>,
+        meta::default_<result_t<ErrorToken<"Unrecognized token">, Pos>>>::type;
   };
 
 } // namespace tokenizer
