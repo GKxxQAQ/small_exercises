@@ -20,6 +20,16 @@ struct fixed_string {
   constexpr std::string_view as_sv() const noexcept {
     return {data, N};
   }
+  constexpr auto operator[](std::size_t i) const noexcept {
+    return data[i];
+  }
+  template <std::size_t Begin, std::size_t End>
+  constexpr fixed_string<End - Begin> slice() const noexcept {
+    char copy[End - Begin + 1];
+    std::copy(data + Begin, data + End, copy);
+    copy[End - Begin] = '\0';
+    return copy;
+  }
   static constexpr auto size() noexcept {
     return N;
   }
