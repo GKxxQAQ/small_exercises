@@ -150,7 +150,7 @@ namespace tokenizer {
           typename parser<next_pos, CurrentTokens..., new_token>::result;
     };
     template <CToken... Tokens>
-    struct parser<Src::size(), Tokens...> {
+    struct parser<Src.size(), Tokens...> {
       using result = TokenSequence<Tokens...>;
     };
 
@@ -160,9 +160,9 @@ namespace tokenizer {
   template <fixed_string Src>
   template <std::size_t Pos>
   struct Tokenizer<Src>::next_nonwhitespace_pos {
-    static constexpr move() noexcept {
+    static constexpr auto move() noexcept {
       auto i = Pos;
-      while (i < Src::size() && is_whitespace(Src[i]))
+      while (i < Src.size() && is_whitespace(Src[i]))
         ++i;
       return i;
     }
@@ -179,18 +179,17 @@ namespace tokenizer {
       using token = Token;
       static constexpr auto end_pos = EndPos;
     };
-    using result = decltype(get());
 
    private:
     static constexpr auto match_true() noexcept {
-      if constexpr (Pos + 3 < Src::size() && Src[Pos + 1] == 'r' &&
+      if constexpr (Pos + 3 < Src.size() && Src[Pos + 1] == 'r' &&
                     Src[Pos + 2] == 'u' && Src[Pos + 3] == 'e')
         return result_wrapper<ErrorToken<"expected 'true'">, Pos>{};
       else
         return result_wrapper<True, Pos + 4>{};
     }
     static constexpr auto match_false() noexcept {
-      if constexpr (Pos + 4 < Src::size() && Src[Pos + 1] == 'a' &&
+      if constexpr (Pos + 4 < Src.size() && Src[Pos + 1] == 'a' &&
                     Src[Pos + 2] == 'l' && Src[Pos + 3] == 's' &&
                     Src[Pos + 4] == 'e')
         return result_wrapper<ErrorToken<"expected 'false'">, Pos>{};
@@ -198,7 +197,7 @@ namespace tokenizer {
         return result_wrapper<False, Pos + 5>{};
     }
     static constexpr auto match_null() noexcept {
-      if constexpr (Pos + 3 < Src::size() && Src[Pos + 1] == 'u' &&
+      if constexpr (Pos + 3 < Src.size() && Src[Pos + 1] == 'u' &&
                     Src[Pos + 2] == 'l' && Src[Pos + 3] == 'l')
         return result_wrapper<ErrorToken<"expected 'null'">, Pos>{};
       else
@@ -234,6 +233,9 @@ namespace tokenizer {
       else
         return match_integer();
     }
+
+   public:
+    using result = decltype(get());
   };
 
 } // namespace tokenizer
