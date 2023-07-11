@@ -208,7 +208,9 @@ namespace tokenizer {
         return result_t<Null, Pos + 4>{};
     }
 
-    struct string_matcher {};
+    struct string_matcher {
+
+    };
 
     struct integer_matcher {
       template <std::size_t Cur>
@@ -243,7 +245,7 @@ namespace tokenizer {
           0,
           meta::case_if<[](...) { return digits_length == 0; },
                         result_t<ErrorToken<"expected integer">, start_pos>>,
-          meta::case_if<[](...) { return digits_length > 10; },
+          meta::case_if<[](...) { return (digits_length > 10); },
                         result_t<ErrorToken<"integer too long">, start_pos>>,
           meta::case_if<
               [](...) { return too_many_leading_zeros; },
