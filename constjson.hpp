@@ -2,6 +2,7 @@
 #define GKXX_CONSTJSON_HPP
 
 #include <concepts>
+#include <utility>
 
 #include "fixed_string.hpp"
 #include "switch_case.hpp"
@@ -9,8 +10,8 @@
 /*
 Tokens:
   integer: -?(0|[1-9][0-9]*)
-  string: "[alphabets, digits, punctuations, escapes '\\', '\n', '\r', '\t',
-'\"']*" true, false, null
+  string: "[alpha/num, punctuations, escapes '\\', '\n', '\r', '\t', '\"']*"
+  true, false, null
   '{', '}', '[', ']', ',', ':'
  */
 
@@ -134,6 +135,9 @@ namespace tokenizer {
   inline constexpr bool is_digit(char c) {
     return c >= '0' && c <= '9';
   }
+  inline constexpr bool is_supported_escape(char c) {
+    return c == '\\' || c == 'n' || c == 'r' || c == 't' || c == '\"';
+  }
 
   template <fixed_string Src>
   struct Tokenizer {
@@ -209,7 +213,62 @@ namespace tokenizer {
     }
 
     struct string_matcher {
-
+      static constexpr auto first_scan() noexcept {
+        constexpr auto failure = Pos;
+        if constexpr (Pos + 1 == Src.size())
+          return std::pair{failure, 0};
+        else {
+          auto cur = Pos + 1;
+          auto escape = 0;
+          while (cur < Src.size() && Src[cur] != '"') {
+            if (Src[cur] == '\\') {
+              ++cur;
+              if (cur < Src.size() && is_supported_escape(Src[cur])) {
+                ++cur;
+                ++escape;
+              } else
+                return std::pair{cur, -1};
+            } else
+              ++cur;
+          }
+          if (cur < Src.size() && Src[cur] == '"')
+            return std::pair{cur, escape};
+          else
+            return std::pair{failure, 0};
+        }
+      }
+      static constexpr auto get_contents() noexcept {
+        char contents[end_quote_pos - Pos - 1 - escape_cnt];
+        std::size_t fill = 0;
+        for (auto i = Pos + 1; i != end_quote_pos; ++i) {
+          if (Src[i] == '\\') {
+            ++i;
+            if (Src[i] == '\\')
+              contents[fill++] = '\\';
+            else if (Src[i] == 'n')
+              contents[fill++] = '\n';
+            else if (Src[i] == 'r')
+              contents[fill++] = '\r';
+            else if (Src[i] == 't')
+              contents[fill++] = '\t';
+            else // Src[i] == '\"'
+              contents[fill++] = '\"';
+          } else
+            contents[fill++] = Src[i];
+        }
+        return fixed_string(contents);
+      }
+      static constexpr auto first_scan_result = first_scan();
+      static constexpr auto end_quote_pos = first_scan_result.first;
+      static constexpr auto escape_cnt = first_scan_result.second;
+      static constexpr auto get_result() noexcept {
+        if constexpr (end_quote_pos == Pos)
+          return result_t<ErrorToken<"invalid string">, Pos>{};
+        else if constexpr (escape_cnt == -1)
+          return result_t<ErrorToken<"unsupported escape">, end_quote_pos>{};
+        else
+          return result_t<String<get_contents()>, end_quote_pos + 1>{};
+      }
     };
 
     struct integer_matcher {
@@ -256,8 +315,7 @@ namespace tokenizer {
                                  start_pos>>,
           meta::default_<result_t<
               Integer<neg ? -static_cast<int>(value) : static_cast<int>(value)>,
-              end_pos>>
-      >::type;
+              end_pos>>>::type;
     };
 
    public:
