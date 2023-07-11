@@ -81,31 +81,31 @@ Object<
 
 namespace gkxx::constjson {
 
+template <int N>
+struct Integer {
+  static constexpr int value = N;
+};
+
+template <typename T>
+inline constexpr auto is_integer_token = false;
+template <int N>
+inline constexpr auto is_integer_token<Integer<N>> = true;
+
+template <fixed_string S>
+struct String {
+  static constexpr fixed_string value = S;
+};
+
+template <typename T>
+inline constexpr auto is_string_token = false;
+template <fixed_string S>
+inline constexpr auto is_string_token<String<S>> = true;
+
+struct True {};
+struct False {};
+struct Null {};
+
 namespace tokenizer {
-
-  template <int N>
-  struct Integer {
-    static constexpr int value = N;
-  };
-
-  template <typename T>
-  inline constexpr auto is_integer_token = false;
-  template <int N>
-  inline constexpr auto is_integer_token<Integer<N>> = true;
-
-  template <fixed_string S>
-  struct String {
-    static constexpr fixed_string value = S;
-  };
-
-  template <typename T>
-  inline constexpr auto is_string_token = false;
-  template <fixed_string S>
-  inline constexpr auto is_string_token<String<S>> = true;
-
-  struct True {};
-  struct False {};
-  struct Null {};
 
   struct LBrace {};
   struct RBrace {};
@@ -392,6 +392,12 @@ namespace tokenizer {
   };
 
 } // namespace tokenizer
+
+namespace parser {
+
+  // TODO: parser
+
+}
 
 } // namespace gkxx::constjson
 
