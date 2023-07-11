@@ -254,8 +254,10 @@ namespace tokenizer {
                         result_t<ErrorToken<"integer value exceeding the range "
                                             "of 32-bit signed integers">,
                                  start_pos>>,
-          meta::default_<Integer<neg ? -static_cast<int>(value)
-                                     : static_cast<int>(value)>>>::type;
+          meta::default_<result_t<
+              Integer<neg ? -static_cast<int>(value) : static_cast<int>(value)>,
+              end_pos>>
+      >::type;
     };
 
    public:
