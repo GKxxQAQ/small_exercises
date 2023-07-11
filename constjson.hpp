@@ -131,6 +131,9 @@ namespace tokenizer {
   inline constexpr bool is_whitespace(char c) {
     return c == ' ' || c == '\n' || c == '\t' || c == '\r';
   }
+  inline constexpr bool is_digit(char c) {
+    return c >= '0' && c <= '9';
+  }
 
   template <fixed_string Src>
   struct Tokenizer {
@@ -208,7 +211,49 @@ namespace tokenizer {
     struct string_matcher {};
 
     struct integer_matcher {
-      
+      template <std::size_t Cur>
+      struct next_nondigit_pos {
+        static constexpr auto result = Cur < Src.size() && is_digit(Src[Cur])
+                                           ? next_nondigit_pos<Cur + 1>::result
+                                           : Cur;
+      };
+      template <std::size_t start, std::size_t end>
+      struct calc_value {
+        static constexpr std::size_t
+            result = end - start > 10
+                         ? 0
+                         : calc_value<start, end - 1>::result * 10u +
+                               (Src[end - 1] - '0');
+      };
+      template <std::size_t pos>
+      struct calc_value<pos, pos> {
+        static constexpr std::size_t result = 0;
+      };
+      static constexpr auto neg = (Src[Pos] == '-');
+      static constexpr auto start_pos = neg ? Pos + 1 : Pos;
+      static constexpr auto end_pos = next_nondigit_pos<start_pos>::result;
+      static constexpr auto digits_length = end_pos - start_pos;
+      static constexpr auto too_many_leading_zeros =
+          digits_length >= 1 && Src[start_pos] == '0' && digits_length >= 2;
+      static constexpr std::size_t value =
+          calc_value<start_pos, end_pos>::result;
+      static constexpr auto overflow = value >
+                                       (2147483647ul + static_cast<int>(neg));
+      using result = typename meta::switch_<
+          0,
+          meta::case_if<[](...) { return digits_length == 0; },
+                        result_t<ErrorToken<"expected integer">, start_pos>>,
+          meta::case_if<[](...) { return digits_length > 10; },
+                        result_t<ErrorToken<"integer too long">, start_pos>>,
+          meta::case_if<
+              [](...) { return too_many_leading_zeros; },
+              result_t<ErrorToken<"too many leading zeros">, start_pos>>,
+          meta::case_if<[](...) { return overflow; },
+                        result_t<ErrorToken<"integer value exceeding the range "
+                                            "of 32-bit signed integers">,
+                                 start_pos>>,
+          meta::default_<Integer<neg ? -static_cast<int>(value)
+                                     : static_cast<int>(value)>>>::type;
     };
 
    public:
@@ -223,7 +268,7 @@ namespace tokenizer {
         meta::case_<'f', decltype(match_false())>,
         meta::case_<'n', decltype(match_null())>,
         meta::case_<'"', typename string_matcher::result>,
-        meta::case_if<[](char c) { return c == '-' || (c >= '0' && c <= '9'); },
+        meta::case_if<[](char c) { return c == '-' || is_digit(c); },
                       typename integer_matcher::result>,
         meta::default_<result_t<ErrorToken<"Unrecognized token">, Pos>>>::type;
   };
