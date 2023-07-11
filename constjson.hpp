@@ -142,23 +142,23 @@ namespace tokenizer {
           return std::to_string(T::value);
         else if constexpr (is_string_token<T>)
           return "\"" + T::value.as_string() + "\"";
-        else if constexpr (std::same_as<T, True>)
+        else if constexpr (std::is_same_v<T, True>)
           return "true";
-        else if constexpr (std::same_as<T, False>)
+        else if constexpr (std::is_same_v<T, False>)
           return "false";
-        else if constexpr (std::same_as<T, Null>)
+        else if constexpr (std::is_same_v<T, Null>)
           return "null";
-        else if constexpr (std::same_as<T, LBrace>)
+        else if constexpr (std::is_same_v<T, LBrace>)
           return "{";
-        else if constexpr (std::same_as<T, RBrace>)
+        else if constexpr (std::is_same_v<T, RBrace>)
           return "}";
-        else if constexpr (std::same_as<T, LBracket>)
+        else if constexpr (std::is_same_v<T, LBracket>)
           return "[";
-        else if constexpr (std::same_as<T, RBracket>)
+        else if constexpr (std::is_same_v<T, RBracket>)
           return "]";
-        else if constexpr (std::same_as<T, Comma>)
+        else if constexpr (std::is_same_v<T, Comma>)
           return ",";
-        else if constexpr (std::same_as<T, Colon>)
+        else if constexpr (std::is_same_v<T, Colon>)
           return ":";
         else
           return "<Error token: " + T::value.as_string() + ">";
