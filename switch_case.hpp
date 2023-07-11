@@ -31,7 +31,7 @@ namespace detail {
   struct default_label_t {
     explicit default_label_t() = default;
     template <typename T>
-    constexpr auto operator==(T &&) const volatile noexcept {
+    constexpr bool operator==(T &&) const volatile noexcept {
       return true;
     }
   };
