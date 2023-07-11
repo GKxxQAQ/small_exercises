@@ -4,6 +4,7 @@
 #include <compare>
 #include <string_view>
 #include <algorithm>
+#include <string>
 
 namespace gkxx {
 
@@ -19,6 +20,9 @@ struct fixed_string {
   bool operator==(const fixed_string &) const = default;
   constexpr std::string_view as_sv() const noexcept {
     return {data, N};
+  }
+  constexpr std::string as_string() const noexcept {
+    return std::string(as_sv());
   }
   constexpr auto operator[](std::size_t i) const noexcept {
     return data[i];
