@@ -2,6 +2,7 @@
 #define GKXX_CONSTJSON_HPP
 
 #include <concepts>
+#include <string>
 #include <utility>
 
 #include "fixed_string.hpp"
@@ -51,7 +52,7 @@ elements -> {element}
     "compilerArgs": [
       "-Wall",
       "-Wpedantic",
-      "-Wextra",
+      "-Wextra"
     ]
   },
   "version": 4
@@ -83,7 +84,9 @@ namespace gkxx::constjson {
 namespace tokenizer {
 
   template <int N>
-  struct Integer {};
+  struct Integer {
+    static constexpr int value = N;
+  };
 
   template <typename T>
   inline constexpr auto is_integer_token = false;
@@ -91,7 +94,9 @@ namespace tokenizer {
   inline constexpr auto is_integer_token<Integer<N>> = true;
 
   template <fixed_string S>
-  struct String {};
+  struct String {
+    static constexpr fixed_string value = S;
+  };
 
   template <typename T>
   inline constexpr auto is_string_token = false;
@@ -110,7 +115,9 @@ namespace tokenizer {
   struct Colon {};
 
   template <fixed_string Msg>
-  struct ErrorToken {};
+  struct ErrorToken {
+    static constexpr fixed_string value = Msg;
+  };
 
   template <typename T>
   inline constexpr auto is_error_token = false;
@@ -127,7 +134,38 @@ namespace tokenizer {
       is_integer_token<T> || is_string_token<T> || is_error_token<T>;
 
   template <CToken... Tokens>
-  struct TokenSequence {};
+  struct TokenSequence {
+    static constexpr auto contains_error = (... || is_error_token<Tokens>);
+    static constexpr std::string reconstruct_string() {
+      auto to_string = []<typename T>(T *) -> std::string {
+        if constexpr (is_integer_token<T>)
+          return std::to_string(T::value);
+        else if constexpr (is_string_token<T>)
+          return "\"" + T::value.as_string() + "\"";
+        else if constexpr (std::same_as<T, True>)
+          return "true";
+        else if constexpr (std::same_as<T, False>)
+          return "false";
+        else if constexpr (std::same_as<T, Null>)
+          return "null";
+        else if constexpr (std::same_as<T, LBrace>)
+          return "{";
+        else if constexpr (std::same_as<T, RBrace>)
+          return "}";
+        else if constexpr (std::same_as<T, LBracket>)
+          return "[";
+        else if constexpr (std::same_as<T, RBracket>)
+          return "]";
+        else if constexpr (std::same_as<T, Comma>)
+          return ",";
+        else if constexpr (std::same_as<T, Colon>)
+          return ":";
+        else
+          return "<Error token: " + T::value.as_string() + ">";
+      };
+      return (... + to_string(static_cast<Tokens *>(nullptr)));
+    }
+  };
 
   inline constexpr bool is_whitespace(char c) {
     return c == ' ' || c == '\n' || c == '\t' || c == '\r';
@@ -154,8 +192,14 @@ namespace tokenizer {
       using new_token = typename token_getter::token;
       static constexpr auto next_pos =
           next_nonwhitespace_pos<token_getter::end_pos>::result;
-      using result =
-          typename parser<next_pos, CurrentTokens..., new_token>::result;
+      static constexpr auto get_result() noexcept {
+        if constexpr (is_error_token<new_token>)
+          return new_token{};
+        else
+          return
+              typename parser<next_pos, CurrentTokens..., new_token>::result{};
+      }
+      using result = decltype(get_result());
     };
     template <CToken... Tokens>
     struct parser<Src.size(), Tokens...> {

@@ -3,6 +3,7 @@
 #include "../../type_name.hpp"
 
 #include <iostream>
+#include <fstream>
 
 constexpr const char big[] = R"(
   {
@@ -19,7 +20,7 @@ constexpr const char big[] = R"(
     "compilerArgs": [
       "-Wall",
       "-Wpedantic",
-      "-Wextra",
+      "-Wextra"
     ]
   },
   "version": 4
@@ -30,8 +31,8 @@ int main() {
   using type = gkxx::constjson::tokenizer::Tokenizer<
       "42 \"hello world\" : , , :::">::result;
   std::cout << gkxx::get_type_name<type>() << std::endl;
-  std::cout << gkxx::get_type_name<
-                   gkxx::constjson::tokenizer::Tokenizer<big>::result>()
-            << std::endl;
+  using big_result = gkxx::constjson::tokenizer::Tokenizer<big>::result;
+  std::cout << gkxx::get_type_name<big_result>() << std::endl;
+  std::ofstream("output.json") << big_result::reconstruct_string() << std::endl;
   return 0;
 }
