@@ -213,6 +213,7 @@ namespace tokenizer {
     }
 
     struct string_matcher {
+     private:
       static constexpr auto first_scan() noexcept {
         constexpr auto failure = Pos;
         if constexpr (Pos + 1 == Src.size())
@@ -238,7 +239,7 @@ namespace tokenizer {
         }
       }
       static constexpr auto get_contents() noexcept {
-        char contents[end_quote_pos - Pos - 1 - escape_cnt];
+        char contents[end_quote_pos - Pos - escape_cnt];
         std::size_t fill = 0;
         for (auto i = Pos + 1; i != end_quote_pos; ++i) {
           if (Src[i] == '\\') {
@@ -256,6 +257,7 @@ namespace tokenizer {
           } else
             contents[fill++] = Src[i];
         }
+        contents[fill] = '\0';
         return fixed_string(contents);
       }
       static constexpr auto first_scan_result = first_scan();
@@ -269,14 +271,22 @@ namespace tokenizer {
         else
           return result_t<String<get_contents()>, end_quote_pos + 1>{};
       }
+
+     public:
+      using result = decltype(get_result());
     };
 
     struct integer_matcher {
+     private:
       template <std::size_t Cur>
       struct next_nondigit_pos {
-        static constexpr auto result = Cur < Src.size() && is_digit(Src[Cur])
-                                           ? next_nondigit_pos<Cur + 1>::result
-                                           : Cur;
+        static constexpr auto get_result() noexcept {
+          if constexpr (Cur < Src.size() && is_digit(Src[Cur]))
+            return next_nondigit_pos<Cur + 1>::result;
+          else
+            return Cur;
+        }
+        static constexpr auto result = get_result();
       };
       template <std::size_t start, std::size_t end>
       struct calc_value {
@@ -300,6 +310,8 @@ namespace tokenizer {
           calc_value<start_pos, end_pos>::result;
       static constexpr auto overflow = value >
                                        (2147483647ul + static_cast<int>(neg));
+
+     public:
       using result = typename meta::switch_<
           0,
           meta::case_if<[](...) { return digits_length == 0; },
