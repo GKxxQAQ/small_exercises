@@ -4,8 +4,10 @@
 #include <concepts>
 #include <string>
 #include <utility>
+#include <tuple>
 
 #include "fixed_string.hpp"
+#include "is_specialization_of.hpp"
 #include "switch_case.hpp"
 
 /*
@@ -142,6 +144,13 @@ struct TokenSequence {
     };
     return (... + to_string(static_cast<Tokens *>(nullptr)));
   }
+  static constexpr auto is_empty = (sizeof...(Tokens) == 0);
+  static constexpr auto tokens_cnt = sizeof...(Tokens);
+  template <std::size_t N>
+    requires(N < tokens_cnt)
+  struct nth {
+    using type = std::decay_t<decltype(std::get<N>(std::tuple<Tokens...>{}))>;
+  };
 };
 
 inline constexpr bool is_whitespace(char c) {
@@ -216,7 +225,7 @@ struct Tokenizer<Src>::token_getter {
                   Src[Pos + 2] == 'u' && Src[Pos + 3] == 'e')
       return result_t<True, Pos + 4>{};
     else
-      return result_t<ErrorToken<"expected 'true'", Pos>>{};
+      return result_t<ErrorToken<"expects 'true'", Pos>>{};
   }
   static constexpr auto match_false() noexcept {
     if constexpr (Pos + 4 < Src.size() && Src[Pos + 1] == 'a' &&
@@ -224,14 +233,14 @@ struct Tokenizer<Src>::token_getter {
                   Src[Pos + 4] == 'e')
       return result_t<False, Pos + 5>{};
     else
-      return result_t<ErrorToken<"expected 'false'", Pos>>{};
+      return result_t<ErrorToken<"expects 'false'", Pos>>{};
   }
   static constexpr auto match_null() noexcept {
     if constexpr (Pos + 3 < Src.size() && Src[Pos + 1] == 'u' &&
                   Src[Pos + 2] == 'l' && Src[Pos + 3] == 'l')
       return result_t<Null, Pos + 4>{};
     else
-      return result_t<ErrorToken<"expected 'null'", Pos>>{};
+      return result_t<ErrorToken<"expects 'null'", Pos>>{};
   }
 
   struct string_matcher {
@@ -335,7 +344,7 @@ struct Tokenizer<Src>::token_getter {
     using result = typename meta::switch_<
         0,
         meta::case_if<[](...) { return digits_length == 0; },
-                      result_t<ErrorToken<"expected integer", start_pos>>>,
+                      result_t<ErrorToken<"expects integer", start_pos>>>,
         meta::case_if<[](...) { return (digits_length > 10); },
                       result_t<ErrorToken<"integer too long", start_pos>>>,
         meta::case_if<
@@ -396,9 +405,21 @@ struct Array {};
 template <fixed_string Key, typename Value>
 struct Member {};
 
-template <fixed_string Src>
+template <fixed_string Msg>
+struct ParseError {
+  static constexpr fixed_string message = Msg;
+};
+
+template <typename T>
+inline constexpr auto is_parse_error = false;
+template <fixed_string Msg>
+inline constexpr auto is_parse_error<ParseError<Msg>> = true;
+
+template <typename Tokens>
+  requires(meta::specialization_of<Tokens, TokenSequence>)
 struct Parser {
-  using tokens = typename Tokenizer<Src>::result;
+  template <std::size_t N>
+  using nth_token = typename Tokens::template nth<N>::type;
 };
 
 } // namespace gkxx::constjson
