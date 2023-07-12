@@ -17,27 +17,6 @@ Tokens:
  */
 
 /*
-json -> {element}
-element -> {ws} {value} {ws}
-value -> {object}
-       | {array}
-       | {string}
-       | {integer}
-       | true
-       | false
-       | null
-object -> \{ {ws} \}
-        | \{ {members} \}
-members -> {member}
-         | {member} , {members}
-member -> {ws} {string} {ws} : {element}
-array -> [{ws}]
-       | [{elements}]
-elements -> {element}
-          | {element} , {elements}
- */
-
-/*
 {
   "configuration": {
     "name": "Linux",
@@ -393,9 +372,29 @@ namespace tokenizer {
 
 } // namespace tokenizer
 
+/*
+json    -> {value}
+value   -> {object}
+         | {array}
+         | String
+         | Integer
+         | True
+         | False
+         | Null
+object  -> LBrace RBrace
+         | LBrace {members} RBrace
+members -> {member}
+         | {member} Comma {members}
+member  -> {string} Colon {value}
+array   -> LBracket RBracket
+         | LBracket {values} RBracket
+values  -> {value}
+         | {value} Comma {values}
+ */
+
 namespace parser {
 
-  // TODO: parser
+  
 
 }
 
