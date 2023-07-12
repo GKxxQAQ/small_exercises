@@ -112,7 +112,6 @@ concept CToken = same_as_any<T, True, False, Null, LBrace, RBrace, LBracket,
 
 template <CToken... Tokens>
 struct TokenSequence {
-  static constexpr auto contains_error = (... || is_error_token<Tokens>);
   static constexpr std::string reconstruct_string() {
     auto to_string = []<typename T>(T *) -> std::string {
       if constexpr (is_integer_token<T>)
