@@ -178,7 +178,7 @@ struct Tokenizer {
     using new_token = typename token_getter::token;
     static constexpr auto next_pos =
         next_nonwhitespace_pos<token_getter::end_pos>::result;
-    static constexpr auto get_result() noexcept {
+    static consteval auto get_result() noexcept {
       if constexpr (is_error_token<new_token>)
         return new_token{};
       else
@@ -197,7 +197,7 @@ struct Tokenizer {
 template <fixed_string Src>
 template <std::size_t Pos>
 struct Tokenizer<Src>::next_nonwhitespace_pos {
-  static constexpr auto move() noexcept {
+  static consteval auto move() noexcept {
     auto i = Pos;
     while (i < Src.size() && is_whitespace(Src[i]))
       ++i;
@@ -220,14 +220,14 @@ struct Tokenizer<Src>::token_getter {
   };
 
  private:
-  static constexpr auto match_true() noexcept {
+  static consteval auto match_true() noexcept {
     if constexpr (Pos + 3 < Src.size() && Src[Pos + 1] == 'r' &&
                   Src[Pos + 2] == 'u' && Src[Pos + 3] == 'e')
       return result_t<True, Pos + 4>{};
     else
       return result_t<ErrorToken<"expects 'true'", Pos>>{};
   }
-  static constexpr auto match_false() noexcept {
+  static consteval auto match_false() noexcept {
     if constexpr (Pos + 4 < Src.size() && Src[Pos + 1] == 'a' &&
                   Src[Pos + 2] == 'l' && Src[Pos + 3] == 's' &&
                   Src[Pos + 4] == 'e')
@@ -235,7 +235,7 @@ struct Tokenizer<Src>::token_getter {
     else
       return result_t<ErrorToken<"expects 'false'", Pos>>{};
   }
-  static constexpr auto match_null() noexcept {
+  static consteval auto match_null() noexcept {
     if constexpr (Pos + 3 < Src.size() && Src[Pos + 1] == 'u' &&
                   Src[Pos + 2] == 'l' && Src[Pos + 3] == 'l')
       return result_t<Null, Pos + 4>{};
@@ -245,7 +245,7 @@ struct Tokenizer<Src>::token_getter {
 
   struct string_matcher {
    private:
-    static constexpr auto first_scan() noexcept {
+    static consteval auto first_scan() noexcept {
       constexpr auto failure = Pos;
       if constexpr (Pos + 1 == Src.size())
         return std::pair{failure, 0};
@@ -269,7 +269,7 @@ struct Tokenizer<Src>::token_getter {
           return std::pair{failure, 0};
       }
     }
-    static constexpr auto get_contents() noexcept {
+    static consteval auto get_contents() noexcept {
       char contents[end_quote_pos - Pos - escape_cnt];
       std::size_t fill = 0;
       for (auto i = Pos + 1; i != end_quote_pos; ++i) {
@@ -294,7 +294,7 @@ struct Tokenizer<Src>::token_getter {
     static constexpr auto first_scan_result = first_scan();
     static constexpr auto end_quote_pos = first_scan_result.first;
     static constexpr auto escape_cnt = first_scan_result.second;
-    static constexpr auto get_result() noexcept {
+    static consteval auto get_result() noexcept {
       if constexpr (end_quote_pos == Pos)
         return result_t<ErrorToken<"invalid string", Pos>>{};
       else if constexpr (escape_cnt == -1)
@@ -311,7 +311,7 @@ struct Tokenizer<Src>::token_getter {
    private:
     template <std::size_t Cur>
     struct next_nondigit_pos {
-      static constexpr auto get_result() noexcept {
+      static consteval auto get_result() noexcept {
         if constexpr (Cur < Src.size() && is_digit(Src[Cur]))
           return next_nondigit_pos<Cur + 1>::result;
         else
