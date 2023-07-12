@@ -91,15 +91,16 @@ struct RBracket {};
 struct Comma {};
 struct Colon {};
 
-template <fixed_string Msg>
+template <fixed_string Msg, std::size_t Pos>
 struct ErrorToken {
-  static constexpr fixed_string value = Msg;
+  static constexpr fixed_string message = Msg;
+  static constexpr std::size_t position = Pos;
 };
 
 template <typename T>
 inline constexpr auto is_error_token = false;
-template <fixed_string Msg>
-inline constexpr auto is_error_token<ErrorToken<Msg>> = true;
+template <fixed_string Msg, std::size_t Pos>
+inline constexpr auto is_error_token<ErrorToken<Msg, Pos>> = true;
 
 template <typename T, typename... Types>
 concept same_as_any = (... || std::same_as<T, Types>);
@@ -137,7 +138,8 @@ struct TokenSequence {
       else if constexpr (std::is_same_v<T, Colon>)
         return ":";
       else
-        return "<Error token: " + T::value.as_string() + ">";
+        return "<Error token: " + T::message.as_string() + " at index " +
+               std::to_string(T::position) + ">";
     };
     return (... + to_string(static_cast<Tokens *>(nullptr)));
   }
@@ -201,7 +203,9 @@ template <std::size_t Pos>
 struct Tokenizer<Src>::token_getter {
   static_assert(!is_whitespace(Src[Pos]),
                 "token_getter encounters a whitespace");
-  template <CToken Token, std::size_t EndPos>
+  template <CToken Token, std::size_t EndPos = static_cast<std::size_t>(-1)>
+    requires(
+        !(!is_error_token<Token> && EndPos == static_cast<std::size_t>(-1)))
   struct result_t {
     using token = Token;
     static constexpr auto end_pos = EndPos;
@@ -211,24 +215,24 @@ struct Tokenizer<Src>::token_getter {
   static constexpr auto match_true() noexcept {
     if constexpr (Pos + 3 < Src.size() && Src[Pos + 1] == 'r' &&
                   Src[Pos + 2] == 'u' && Src[Pos + 3] == 'e')
-      return result_t<ErrorToken<"expected 'true'">, Pos>{};
-    else
       return result_t<True, Pos + 4>{};
+    else
+      return result_t<ErrorToken<"expected 'true'", Pos>>{};
   }
   static constexpr auto match_false() noexcept {
     if constexpr (Pos + 4 < Src.size() && Src[Pos + 1] == 'a' &&
                   Src[Pos + 2] == 'l' && Src[Pos + 3] == 's' &&
                   Src[Pos + 4] == 'e')
-      return result_t<ErrorToken<"expected 'false'">, Pos>{};
-    else
       return result_t<False, Pos + 5>{};
+    else
+      return result_t<ErrorToken<"expected 'false'", Pos>>{};
   }
   static constexpr auto match_null() noexcept {
     if constexpr (Pos + 3 < Src.size() && Src[Pos + 1] == 'u' &&
                   Src[Pos + 2] == 'l' && Src[Pos + 3] == 'l')
-      return result_t<ErrorToken<"expected 'null'">, Pos>{};
-    else
       return result_t<Null, Pos + 4>{};
+    else
+      return result_t<ErrorToken<"expected 'null'", Pos>>{};
   }
 
   struct string_matcher {
@@ -284,9 +288,9 @@ struct Tokenizer<Src>::token_getter {
     static constexpr auto escape_cnt = first_scan_result.second;
     static constexpr auto get_result() noexcept {
       if constexpr (end_quote_pos == Pos)
-        return result_t<ErrorToken<"invalid string">, Pos>{};
+        return result_t<ErrorToken<"invalid string", Pos>>{};
       else if constexpr (escape_cnt == -1)
-        return result_t<ErrorToken<"unsupported escape">, end_quote_pos>{};
+        return result_t<ErrorToken<"unsupported escape", end_quote_pos>>{};
       else
         return result_t<String<get_contents()>, end_quote_pos + 1>{};
     }
@@ -332,16 +336,16 @@ struct Tokenizer<Src>::token_getter {
     using result = typename meta::switch_<
         0,
         meta::case_if<[](...) { return digits_length == 0; },
-                      result_t<ErrorToken<"expected integer">, start_pos>>,
+                      result_t<ErrorToken<"expected integer", start_pos>>>,
         meta::case_if<[](...) { return (digits_length > 10); },
-                      result_t<ErrorToken<"integer too long">, start_pos>>,
+                      result_t<ErrorToken<"integer too long", start_pos>>>,
         meta::case_if<
             [](...) { return too_many_leading_zeros; },
-            result_t<ErrorToken<"too many leading zeros">, start_pos>>,
+            result_t<ErrorToken<"too many leading zeros", start_pos>>>,
         meta::case_if<[](...) { return overflow; },
                       result_t<ErrorToken<"integer value exceeding the range "
-                                          "of 32-bit signed integers">,
-                               start_pos>>,
+                                          "of 32-bit signed integers",
+                                          start_pos>>>,
         meta::default_<result_t<
             Integer<neg ? -static_cast<int>(value) : static_cast<int>(value)>,
             end_pos>>>::type;
@@ -361,7 +365,7 @@ struct Tokenizer<Src>::token_getter {
       meta::case_<'"', typename string_matcher::result>,
       meta::case_if<[](char c) { return c == '-' || is_digit(c); },
                     typename integer_matcher::result>,
-      meta::default_<result_t<ErrorToken<"Unrecognized token">, Pos>>>::type;
+      meta::default_<result_t<ErrorToken<"Unrecognized token", Pos>>>>::type;
 };
 
 /*
@@ -384,7 +388,19 @@ values  -> {value}
          | {value} Comma {values}
  */
 
-namespace parser {}
+template <typename... Members>
+struct Object {};
+
+template <typename... Values>
+struct Array {};
+
+template <fixed_string Key, typename Value>
+struct Member {};
+
+template <fixed_string Src>
+struct Parser {
+  using tokens = typename Tokenizer<Src>::result;
+};
 
 } // namespace gkxx::constjson
 
