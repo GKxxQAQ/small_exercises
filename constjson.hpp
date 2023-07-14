@@ -1,5 +1,5 @@
-#ifndef GKXX_EXERCISE_CONSTJSON_HPP
-#define GKXX_EXERCISE_CONSTJSON_HPP
+#ifndef GKXX_CONSTJSON_HPP
+#define GKXX_CONSTJSON_HPP
 
 #include <concepts>
 #include <string>
@@ -424,4 +424,4 @@ struct Parser {
 
 } // namespace gkxx::constjson
 
-#endif // GKXX_EXERCISE_CONSTJSON_HPP
+#endif // GKXX_CONSTJSON_HPP
