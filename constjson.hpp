@@ -554,9 +554,8 @@ struct Parser<Tokens>::member_parser {
     if constexpr (detail::is_parse_error<value_node>)
       return value{};
     else
-      return internal_result_t<
-          Member<typename nth_token<Pos>::value, value_node>,
-          value::next_pos>{};
+      return internal_result_t<Member<nth_token<Pos>::value, value_node>,
+                               value::next_pos>{};
   }
   using result = decltype(do_parse());
 };
