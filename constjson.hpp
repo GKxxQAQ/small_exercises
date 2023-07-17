@@ -521,10 +521,6 @@ namespace detail {
   concept CTerminal = is_string_token<T> || is_integer_token<T> ||
                       same_as_any<T, True, False, Null>;
 
-  template <typename T>
-  concept CNonTerminal = meta::specialization_of<T, Object> ||
-                         meta::specialization_of<T, Array> || is_member<T>;
-
 } // namespace detail
 
 template <typename Tokens>
