@@ -46,13 +46,13 @@ fixed_string(const char (&)[N]) -> fixed_string<N - 1>;
 template <std::size_t N, std::size_t M>
   requires(N != M)
 inline constexpr bool operator==(const fixed_string<N> &,
-                                 const fixed_string<M> &) {
+                                 const fixed_string<M> &) noexcept {
   return false;
 }
 
 template <std::size_t N, std::size_t M>
 inline constexpr auto operator+(const fixed_string<N> &lhs,
-                                const fixed_string<M> &rhs) {
+                                const fixed_string<M> &rhs) noexcept {
   char data[N + M + 1];
   std::copy_n(lhs.data, lhs.size(), data);
   std::copy_n(rhs.data, rhs.size(), data + lhs.size());
