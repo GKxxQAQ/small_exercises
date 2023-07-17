@@ -546,8 +546,7 @@ struct Parser<Tokens>::bracket_pair_list_parser {
   static consteval auto do_parse() noexcept {
     using lookahead = nth_token<Pos>;
     if constexpr (!std::is_same_v<lookahead, Left>)
-      return internal_result_t<
-          SyntaxError<"expects '" + Left::to_fixed_string() + "'">>{};
+      return error_result_t<"expects '" + Left::to_fixed_string() + "'">{};
     else
       return match_after_left();
   }
@@ -566,8 +565,7 @@ struct Parser<Tokens>::bracket_pair_list_parser {
         if constexpr (std::is_same_v<next_token, RBrace>)
           return internal_result_t<elements_node, next_pos + 1>{};
         else
-          return internal_result_t<
-              SyntaxError<"expects '" + Right::to_fixed_string() + "'">>{};
+          return error_result_t<"expects '" + Right::to_fixed_string() + "'">{};
       }
     }
   }
@@ -580,14 +578,14 @@ struct Parser<Tokens>::member_parser {
   static consteval auto do_parse() noexcept {
     using lookahead = nth_token<Pos>;
     if constexpr (!detail::is_string_token<lookahead>)
-      return internal_result_t<SyntaxError<"expects String">>{};
+      return error_result_t<"expects String">{};
     else
       return match_colon();
   }
   static consteval auto match_colon() noexcept {
     using lookahead = nth_token<Pos + 1>;
     if constexpr (!std::is_same_v<lookahead, Colon>)
-      return internal_result_t<SyntaxError<"expects ':'">>{};
+      return error_result_t<"expects ':'">{};
     else
       return match_value();
   }
