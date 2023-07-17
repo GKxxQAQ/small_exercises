@@ -466,7 +466,7 @@ namespace detail {
 } // namespace detail
 
 template <typename Tokens>
-struct Parser {
+struct ParseTokens {
   static_assert(meta::specialization_of<Tokens, TokenSequence>);
 
   template <std::size_t N>
@@ -522,7 +522,7 @@ struct Parser {
 
 template <typename Tokens>
 template <std::size_t Pos>
-struct Parser<Tokens>::value_parser {
+struct ParseTokens<Tokens>::value_parser {
   static consteval auto do_parse() noexcept {
     using lookahead = nth_token<Pos>;
     if constexpr (std::is_same_v<lookahead, EndOfTokens>)
@@ -542,7 +542,7 @@ struct Parser<Tokens>::value_parser {
 template <typename Tokens>
 template <std::size_t Pos, typename Left, typename Right,
           template <std::size_t> typename list_parser>
-struct Parser<Tokens>::bracket_pair_list_parser {
+struct ParseTokens<Tokens>::bracket_pair_list_parser {
   static consteval auto do_parse() noexcept {
     using lookahead = nth_token<Pos>;
     if constexpr (!std::is_same_v<lookahead, Left>)
@@ -574,7 +574,7 @@ struct Parser<Tokens>::bracket_pair_list_parser {
 
 template <typename Tokens>
 template <std::size_t Pos>
-struct Parser<Tokens>::member_parser {
+struct ParseTokens<Tokens>::member_parser {
   static consteval auto do_parse() noexcept {
     using lookahead = nth_token<Pos>;
     if constexpr (!detail::is_string_token<lookahead>)
@@ -604,7 +604,7 @@ struct Parser<Tokens>::member_parser {
 template <typename Tokens>
 template <std::size_t Pos, template <std::size_t> typename element_parser,
           template <typename...> typename list_type>
-struct Parser<Tokens>::comma_list_parser {
+struct ParseTokens<Tokens>::comma_list_parser {
   template <std::size_t CurPos, typename... CurElems>
   struct parse {
     static consteval auto get_result() noexcept {
