@@ -60,6 +60,17 @@ inline consteval auto operator+(const fixed_string<N> &lhs,
   return fixed_string(data);
 }
 
+template <std::size_t N, std::size_t M>
+inline consteval auto operator+(const char (&lhs)[N],
+                                const fixed_string<M> &rhs) noexcept {
+  return fixed_string(lhs) + rhs;
+}
+
+template <std::size_t N, std::size_t M>
+inline consteval auto operator+(const fixed_string<N> &lhs, const char (&rhs)[M]) noexcept {
+  return lhs + fixed_string(rhs);
+}
+
 } // namespace gkxx
 
 #endif // GKXX_STRING_LITERAL_HPP
