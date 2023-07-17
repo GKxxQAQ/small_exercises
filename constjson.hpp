@@ -72,16 +72,52 @@ struct String {
   static constexpr fixed_string value = S;
 };
 
-struct True {};
-struct False {};
-struct Null {};
+struct True {
+  static constexpr auto to_fixed_string() noexcept {
+    return fixed_string("true");
+  }
+};
+struct False {
+  static constexpr auto to_fixed_string() noexcept {
+    return fixed_string("false");
+  }
+};
+struct Null {
+  static constexpr auto to_fixed_string() noexcept {
+    return fixed_string("null");
+  }
+};
 
-struct LBrace {};
-struct RBrace {};
-struct LBracket {};
-struct RBracket {};
-struct Comma {};
-struct Colon {};
+struct LBrace {
+  static constexpr auto to_fixed_string() noexcept {
+    return fixed_string("{");
+  }
+};
+struct RBrace {
+  static constexpr auto to_fixed_string() noexcept {
+    return fixed_string("}");
+  }
+};
+struct LBracket {
+  static constexpr auto to_fixed_string() noexcept {
+    return fixed_string("[");
+  }
+};
+struct RBracket {
+  static constexpr auto to_fixed_string() noexcept {
+    return fixed_string("]");
+  }
+};
+struct Comma {
+  static constexpr auto to_fixed_string() noexcept {
+    return fixed_string(",");
+  }
+};
+struct Colon {
+  static constexpr auto to_fixed_string() noexcept {
+    return fixed_string(":");
+  }
+};
 
 template <fixed_string Msg, std::size_t Pos>
 struct ErrorToken {
@@ -124,27 +160,13 @@ struct TokenSequence {
       if constexpr (detail::is_integer_token<T>)
         return std::to_string(T::value);
       else if constexpr (detail::is_string_token<T>)
-        return "\"" + T::value.as_string() + "\"";
-      else if constexpr (std::is_same_v<T, True>)
-        return "true";
-      else if constexpr (std::is_same_v<T, False>)
-        return "false";
-      else if constexpr (std::is_same_v<T, Null>)
-        return "null";
-      else if constexpr (std::is_same_v<T, LBrace>)
-        return "{";
-      else if constexpr (std::is_same_v<T, RBrace>)
-        return "}";
-      else if constexpr (std::is_same_v<T, LBracket>)
-        return "[";
-      else if constexpr (std::is_same_v<T, RBracket>)
-        return "]";
-      else if constexpr (std::is_same_v<T, Comma>)
-        return ",";
-      else if constexpr (std::is_same_v<T, Colon>)
-        return ":";
+        return "\"" + T::value.to_string() + "\"";
+      else if constexpr (detail::same_as_any<T, True, False, Null, LBrace,
+                                             RBrace, LBracket, RBracket, Comma,
+                                             Colon>)
+        return T::to_fixed_string().to_string();
       else
-        return "<Error token: " + T::message.as_string() + " at index " +
+        return "<Error token: " + T::message.to_string() + " at index " +
                std::to_string(T::position) + ">";
     };
     return (... + to_string(static_cast<Tokens *>(nullptr)));
@@ -216,6 +238,7 @@ template <std::size_t Pos>
 struct Tokenizer<Src>::token_getter {
   static_assert(!is_whitespace(Src[Pos]),
                 "token_getter encounters a whitespace");
+
   template <CToken Token, std::size_t EndPos = static_cast<std::size_t>(-1)>
     requires(!(!detail::is_error_token<Token> &&
                EndPos == static_cast<std::size_t>(-1)))
@@ -224,13 +247,16 @@ struct Tokenizer<Src>::token_getter {
     static constexpr auto end_pos = EndPos;
   };
 
+  template <fixed_string Msg, std::size_t ErrorPos>
+  using error_result_t = internal_result_t<ErrorToken<Msg, ErrorPos>>;
+
  private:
   static consteval auto match_true() noexcept {
     if constexpr (Pos + 3 < Src.size() && Src[Pos + 1] == 'r' &&
                   Src[Pos + 2] == 'u' && Src[Pos + 3] == 'e')
       return internal_result_t<True, Pos + 4>{};
     else
-      return internal_result_t<ErrorToken<"expects 'true'", Pos>>{};
+      return error_result_t<"expects 'true'", Pos>{};
   }
   static consteval auto match_false() noexcept {
     if constexpr (Pos + 4 < Src.size() && Src[Pos + 1] == 'a' &&
@@ -238,14 +264,14 @@ struct Tokenizer<Src>::token_getter {
                   Src[Pos + 4] == 'e')
       return internal_result_t<False, Pos + 5>{};
     else
-      return internal_result_t<ErrorToken<"expects 'false'", Pos>>{};
+      return error_result_t<"expects 'false'", Pos>{};
   }
   static consteval auto match_null() noexcept {
     if constexpr (Pos + 3 < Src.size() && Src[Pos + 1] == 'u' &&
                   Src[Pos + 2] == 'l' && Src[Pos + 3] == 'l')
       return internal_result_t<Null, Pos + 4>{};
     else
-      return internal_result_t<ErrorToken<"expects 'null'", Pos>>{};
+      return error_result_t<"expects 'null'", Pos>{};
   }
 
   struct string_matcher {
@@ -301,10 +327,9 @@ struct Tokenizer<Src>::token_getter {
     static constexpr auto escape_cnt = first_scan_result.second;
     static consteval auto get_result() noexcept {
       if constexpr (end_quote_pos == Pos)
-        return internal_result_t<ErrorToken<"invalid string", Pos>>{};
+        return error_result_t<"invalid string", Pos>{};
       else if constexpr (escape_cnt == -1)
-        return internal_result_t<
-            ErrorToken<"unsupported escape", end_quote_pos>>{};
+        return error_result_t<"unsupported escape", end_quote_pos>{};
       else
         return internal_result_t<String<get_contents()>, end_quote_pos + 1>{};
     }
@@ -349,20 +374,16 @@ struct Tokenizer<Src>::token_getter {
    public:
     using result = typename meta::switch_<
         0,
-        meta::case_if<
-            [](...) { return digits_length == 0; },
-            internal_result_t<ErrorToken<"expects integer", start_pos>>>,
-        meta::case_if<
-            [](...) { return (digits_length > 10); },
-            internal_result_t<ErrorToken<"integer too long", start_pos>>>,
-        meta::case_if<
-            [](...) { return too_many_leading_zeros; },
-            internal_result_t<ErrorToken<"too many leading zeros", start_pos>>>,
-        meta::case_if<
-            [](...) { return overflow; },
-            internal_result_t<ErrorToken<"integer value exceeding the range "
-                                         "of 32-bit signed integers",
-                                         start_pos>>>,
+        meta::case_if<[](...) { return digits_length == 0; },
+                      error_result_t<"expects integer", start_pos>>,
+        meta::case_if<[](...) { return (digits_length > 10); },
+                      error_result_t<"integer too long", start_pos>>,
+        meta::case_if<[](...) { return too_many_leading_zeros; },
+                      error_result_t<"too many leading zeros", start_pos>>,
+        meta::case_if<[](...) { return overflow; },
+                      error_result_t<"integer value exceeding the range "
+                                     "of 32-bit signed integers",
+                                     start_pos>>,
         meta::default_<internal_result_t<
             Integer<neg ? -static_cast<int>(value) : static_cast<int>(value)>,
             end_pos>>>::type;
@@ -382,8 +403,7 @@ struct Tokenizer<Src>::token_getter {
       meta::case_<'"', typename string_matcher::result>,
       meta::case_if<[](char c) { return c == '-' || is_digit(c); },
                     typename integer_matcher::result>,
-      meta::default_<
-          internal_result_t<ErrorToken<"Unrecognized token", Pos>>>>::type;
+      meta::default_<error_result_t<"Unrecognized token", Pos>>>::type;
 };
 
 /*
@@ -418,7 +438,7 @@ struct Member {};
 struct EndOfTokens {};
 
 template <fixed_string Msg>
-struct ParseError {
+struct SyntaxError {
   static constexpr fixed_string message = Msg;
 };
 
@@ -431,9 +451,9 @@ namespace detail {
   inline constexpr auto is_member<Member<Key, Value>> = true;
 
   template <typename T>
-  inline constexpr auto is_parse_error = false;
+  inline constexpr auto is_syntax_error = false;
   template <fixed_string Msg>
-  inline constexpr auto is_parse_error<ParseError<Msg>> = true;
+  inline constexpr auto is_syntax_error<SyntaxError<Msg>> = true;
 
   template <typename T>
   concept CTerminal = is_string_token<T> || is_integer_token<T> ||
@@ -459,12 +479,15 @@ struct Parser {
 
   template <typename ParseResult,
             std::size_t NextPos = static_cast<std::size_t>(-1)>
-    requires(!(!detail::is_parse_error<ParseResult> &&
+    requires(!(!detail::is_syntax_error<ParseResult> &&
                NextPos == static_cast<std::size_t>(-1)))
   struct internal_result_t {
     using node = ParseResult;
     static constexpr auto next_pos = NextPos;
   };
+
+  template <fixed_string Msg>
+  using error_result_t = internal_result_t<SyntaxError<Msg>>;
 
   template <std::size_t Pos>
   struct value_parser;
@@ -493,6 +516,8 @@ struct Parser {
   template <std::size_t Pos>
   struct object_parser
       : bracket_pair_list_parser<Pos, LBrace, RBrace, members_parser> {};
+
+  using result = typename value_parser<0>::result;
 };
 
 template <typename Tokens>
@@ -501,7 +526,7 @@ struct Parser<Tokens>::value_parser {
   static consteval auto do_parse() noexcept {
     using lookahead = nth_token<Pos>;
     if constexpr (std::is_same_v<lookahead, EndOfTokens>)
-      return internal_result_t<ParseError<"expects Value">>{};
+      return internal_result_t<SyntaxError<"expects Value">>{};
     else if constexpr (std::is_same_v<lookahead, LBrace>)
       return typename object_parser<Pos>::result{};
     else if constexpr (std::is_same_v<lookahead, LBracket>)
@@ -522,7 +547,7 @@ struct Parser<Tokens>::bracket_pair_list_parser {
     using lookahead = nth_token<Pos>;
     if constexpr (!std::is_same_v<lookahead, Left>)
       return internal_result_t<
-          ParseError<"expects '" + Left::to_fixed_string() + "'">>{};
+          SyntaxError<"expects '" + Left::to_fixed_string() + "'">>{};
     else
       return match_after_left();
   }
@@ -533,7 +558,7 @@ struct Parser<Tokens>::bracket_pair_list_parser {
     else {
       using elements_result = typename list_parser<Pos + 1>::result;
       using elements_node = typename elements_result::node;
-      if constexpr (detail::is_parse_error<elements_node>)
+      if constexpr (detail::is_syntax_error<elements_node>)
         return elements_result{};
       else {
         constexpr auto next_pos = elements_result::next_pos;
@@ -542,7 +567,7 @@ struct Parser<Tokens>::bracket_pair_list_parser {
           return internal_result_t<elements_node, next_pos + 1>{};
         else
           return internal_result_t<
-              ParseError<"expects '" + Right::to_fixed_string() + "'">>{};
+              SyntaxError<"expects '" + Right::to_fixed_string() + "'">>{};
       }
     }
   }
@@ -555,21 +580,21 @@ struct Parser<Tokens>::member_parser {
   static consteval auto do_parse() noexcept {
     using lookahead = nth_token<Pos>;
     if constexpr (!detail::is_string_token<lookahead>)
-      return internal_result_t<ParseError<"expects String">>{};
+      return internal_result_t<SyntaxError<"expects String">>{};
     else
       return match_colon();
   }
   static consteval auto match_colon() noexcept {
     using lookahead = nth_token<Pos + 1>;
     if constexpr (!std::is_same_v<lookahead, Colon>)
-      return internal_result_t<ParseError<"expects ':'">>{};
+      return internal_result_t<SyntaxError<"expects ':'">>{};
     else
       return match_value();
   }
   static consteval auto match_value() noexcept {
     using value_result = typename value_parser<Pos + 2>::result;
     using value_node = typename value_result::node;
-    if constexpr (detail::is_parse_error<value_node>)
+    if constexpr (detail::is_syntax_error<value_node>)
       return value_result{};
     else
       return internal_result_t<Member<nth_token<Pos>::value_result, value_node>,
@@ -587,7 +612,7 @@ struct Parser<Tokens>::comma_list_parser {
     static consteval auto get_result() noexcept {
       using new_elem_result = typename element_parser<CurPos>::result;
       using new_elem_node = typename new_elem_result::node;
-      if constexpr (detail::is_parse_error<new_elem_node>)
+      if constexpr (detail::is_syntax_error<new_elem_node>)
         return new_elem_result{};
       else {
         constexpr auto next_pos = new_elem_result::next_pos;
