@@ -456,8 +456,8 @@ struct Object {
   }
 };
 
-template <typename... Values>
-struct Array {
+namespace detail {
+
   template <typename...>
   struct make_comma_sep_list;
 
@@ -483,9 +483,13 @@ struct Array {
     }
   };
 
+} // namespace detail
+
+template <typename... Values>
+struct Array {
   static constexpr auto to_pretty_string(std::size_t indent) {
     return std::string(indent, ' ') + "Array<" +
-           make_comma_sep_list<Values...>{}(indent) + ">\n";
+           detail::make_comma_sep_list<Values...>{}(indent) + ">\n";
   }
 };
 
