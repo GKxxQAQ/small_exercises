@@ -1,10 +1,10 @@
 #ifndef GKXX_STRING_LITERAL_HPP
 #define GKXX_STRING_LITERAL_HPP
 
-#include <compare>
-#include <string_view>
 #include <algorithm>
+#include <compare>
 #include <string>
+#include <string_view>
 
 namespace gkxx {
 
@@ -48,6 +48,16 @@ template <std::size_t N, std::size_t M>
 inline constexpr bool operator==(const fixed_string<N> &,
                                  const fixed_string<M> &) {
   return false;
+}
+
+template <std::size_t N, std::size_t M>
+inline constexpr auto operator+(const fixed_string<N> &lhs,
+                                const fixed_string<M> &rhs) {
+  char data[N + M + 1];
+  std::copy_n(lhs.data, lhs.size(), data);
+  std::copy_n(rhs.data, rhs.size(), data + lhs.size());
+  data[N + M] = '\0';
+  return fixed_string(data);
 }
 
 } // namespace gkxx
