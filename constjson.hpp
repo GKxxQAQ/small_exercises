@@ -689,6 +689,7 @@ struct ParseTokens<Tokens>::comma_list_parser {
     }
     using result = decltype(get_result());
   };
+  using result = typename parse<Pos>::result;
 };
 
 template <fixed_string JsonCode>
