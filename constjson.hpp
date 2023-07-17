@@ -533,12 +533,18 @@ struct ParseTokens {
   static_assert(meta::specialization_of<Tokens, TokenSequence>);
 
   template <std::size_t N>
-  using nth_token = decltype([]() {
-    if constexpr (N < Tokens::size)
-      return typename Tokens::template nth<N>::type{};
-    else
-      return EndOfTokens{};
-  }());
+  struct nth_token_impl {
+    static constexpr auto get_result() noexcept {
+      if constexpr (N < Tokens::size)
+        return typename Tokens::template nth<N>::type{};
+      else
+        return EndOfTokens{};
+    }
+    using result = decltype(get_result());
+  };
+
+  template <std::size_t N>
+  using nth_token = typename nth_token_impl<N>::result;
 
   template <typename ParseResult,
             std::size_t NextPos = static_cast<std::size_t>(-1)>
