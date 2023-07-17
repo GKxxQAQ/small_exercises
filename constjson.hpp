@@ -446,8 +446,9 @@ namespace detail {
 } // namespace detail
 
 template <typename Tokens>
-  requires(meta::specialization_of<Tokens, TokenSequence>)
 struct Parser {
+  static_assert(meta::specialization_of<Tokens, TokenSequence>);
+
   template <std::size_t N>
   using nth_token = decltype([]() {
     if constexpr (N < Tokens::size)
@@ -469,17 +470,32 @@ struct Parser {
   struct value_parser;
 
   template <std::size_t Pos>
-  struct object_parser;
-
-  template <std::size_t Pos>
-  struct array_parser;
-
-  template <std::size_t Pos>
   struct member_parser;
+
+  template <std::size_t Pos, template <std::size_t> typename element_parser,
+            template <typename...> typename list_type>
+  struct comma_list_parser;
+
+  template <std::size_t Pos, typename Left, typename Right,
+            template <std::size_t> typename list_parser>
+  struct bracket_pair_list_parser;
+
+  template <std::size_t Pos>
+  struct members_parser : comma_list_parser<Pos, member_parser, Object> {};
+
+  template <std::size_t Pos>
+  struct values_parser : comma_list_parser<Pos, value_parser, Array> {};
+
+  template <std::size_t Pos>
+  struct array_parser
+      : bracket_pair_list_parser<Pos, LBracket, RBracket, values_parser> {};
+
+  template <std::size_t Pos>
+  struct object_parser
+      : bracket_pair_list_parser<Pos, LBrace, RBrace, members_parser> {};
 };
 
 template <typename Tokens>
-  requires(meta::specialization_of<Tokens, TokenSequence>)
 template <std::size_t Pos>
 struct Parser<Tokens>::value_parser {
   static consteval auto do_parse() noexcept {
@@ -499,31 +515,34 @@ struct Parser<Tokens>::value_parser {
 };
 
 template <typename Tokens>
-  requires(meta::specialization_of<Tokens, TokenSequence>)
-template <std::size_t Pos>
-struct Parser<Tokens>::object_parser {
+template <std::size_t Pos, typename Left, typename Right,
+          template <std::size_t> typename list_parser>
+struct Parser<Tokens>::bracket_pair_list_parser {
   static consteval auto do_parse() noexcept {
     using lookahead = nth_token<Pos>;
-    if constexpr (!std::is_same_v<lookahead, LBrace>)
-      return internal_result_t<ParseError<"expects '{'">>{};
+    if constexpr (!std::is_same_v<lookahead, Left>)
+      return internal_result_t<
+          ParseError<"expects '" + Left::to_fixed_string() + "'">>{};
     else
-      return match_after_lbrace();
+      return match_after_left();
   }
-  static consteval auto match_after_lbrace() noexcept {
+  static consteval auto match_after_left() noexcept {
     using lookahead = nth_token<Pos + 1>;
-    if constexpr (std::is_same_v<lookahead, RBrace>)
+    if constexpr (std::is_same_v<lookahead, Right>)
       return internal_result_t<Object<>, Pos + 2>{};
     else {
-      using members = typename members_parser<Pos + 1>::result;
-      using members_node = typename members::node;
-      if constexpr (detail::is_parse_error<members_node>)
-        return members{};
+      using elements_result = typename list_parser<Pos + 1>::result;
+      using elements_node = typename elements_result::node;
+      if constexpr (detail::is_parse_error<elements_node>)
+        return elements_result{};
       else {
-        using next_token = nth_token<members::next_pos>;
+        constexpr auto next_pos = elements_result::next_pos;
+        using next_token = nth_token<next_pos>;
         if constexpr (std::is_same_v<next_token, RBrace>)
-          return internal_result_t<Object<members_node>, next_token + 1>{};
+          return internal_result_t<elements_node, next_pos + 1>{};
         else
-          return internal_result_t<ParseError<"expects '}'">>{};
+          return internal_result_t<
+              ParseError<"expects '" + Right::to_fixed_string() + "'">>{};
       }
     }
   }
@@ -531,7 +550,6 @@ struct Parser<Tokens>::object_parser {
 };
 
 template <typename Tokens>
-  requires(meta::specialization_of<Tokens, TokenSequence>)
 template <std::size_t Pos>
 struct Parser<Tokens>::member_parser {
   static consteval auto do_parse() noexcept {
@@ -549,15 +567,41 @@ struct Parser<Tokens>::member_parser {
       return match_value();
   }
   static consteval auto match_value() noexcept {
-    using value = typename value_parser<Pos + 2>::result;
-    using value_node = typename value::node;
+    using value_result = typename value_parser<Pos + 2>::result;
+    using value_node = typename value_result::node;
     if constexpr (detail::is_parse_error<value_node>)
-      return value{};
+      return value_result{};
     else
-      return internal_result_t<Member<nth_token<Pos>::value, value_node>,
-                               value::next_pos>{};
+      return internal_result_t<Member<nth_token<Pos>::value_result, value_node>,
+                               value_result::next_pos>{};
   }
   using result = decltype(do_parse());
+};
+
+template <typename Tokens>
+template <std::size_t Pos, template <std::size_t> typename element_parser,
+          template <typename...> typename list_type>
+struct Parser<Tokens>::comma_list_parser {
+  template <std::size_t CurPos, typename... CurElems>
+  struct parse {
+    static consteval auto get_result() noexcept {
+      using new_elem_result = typename element_parser<CurPos>::result;
+      using new_elem_node = typename new_elem_result::node;
+      if constexpr (detail::is_parse_error<new_elem_node>)
+        return new_elem_result{};
+      else {
+        constexpr auto next_pos = new_elem_result::next_pos;
+        using next_token = nth_token<next_pos>;
+        if constexpr (std::is_same_v<next_token, Comma>)
+          return typename parse<next_pos + 1, CurElems...,
+                                new_elem_node>::result{};
+        else
+          return internal_result_t<list_type<CurElems..., new_elem_node>,
+                                   next_pos>{};
+      }
+    }
+    using result = decltype(get_result());
+  };
 };
 
 } // namespace gkxx::constjson
