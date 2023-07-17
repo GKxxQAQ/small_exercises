@@ -503,9 +503,10 @@ struct Member {
 
 struct EndOfTokens {};
 
-template <fixed_string Msg>
+template <fixed_string Msg, std::size_t Pos>
 struct SyntaxError {
   static constexpr fixed_string message = Msg;
+  static constexpr std::size_t position = Pos;
 };
 
 namespace detail {
@@ -518,8 +519,8 @@ namespace detail {
 
   template <typename T>
   inline constexpr auto is_syntax_error = false;
-  template <fixed_string Msg>
-  inline constexpr auto is_syntax_error<SyntaxError<Msg>> = true;
+  template <fixed_string Msg, std::size_t Pos>
+  inline constexpr auto is_syntax_error<SyntaxError<Msg, Pos>> = true;
 
   template <typename T>
   concept CTerminal = is_string_token<T> || is_integer_token<T> ||
@@ -548,8 +549,8 @@ struct ParseTokens {
     static constexpr auto next_pos = NextPos;
   };
 
-  template <fixed_string Msg>
-  using error_result_t = internal_result_t<SyntaxError<Msg>>;
+  template <fixed_string Msg, std::size_t Pos>
+  using error_result_t = internal_result_t<SyntaxError<Msg, Pos>>;
 
   template <std::size_t Pos>
   struct value_parser;
@@ -588,7 +589,7 @@ struct ParseTokens<Tokens>::value_parser {
   static consteval auto do_parse() noexcept {
     using lookahead = nth_token<Pos>;
     if constexpr (std::is_same_v<lookahead, EndOfTokens>)
-      return internal_result_t<SyntaxError<"expects Value">>{};
+      return error_result_t<"expects Value", Pos>{};
     else if constexpr (std::is_same_v<lookahead, LBrace>)
       return typename object_parser<Pos>::result{};
     else if constexpr (std::is_same_v<lookahead, LBracket>)
@@ -608,7 +609,7 @@ struct ParseTokens<Tokens>::bracket_pair_list_parser {
   static consteval auto do_parse() noexcept {
     using lookahead = nth_token<Pos>;
     if constexpr (!std::is_same_v<lookahead, Left>)
-      return error_result_t<"expects '" + Left::to_fixed_string() + "'">{};
+      return error_result_t<"expects '" + Left::to_fixed_string() + "'", Pos>{};
     else
       return match_after_left();
   }
@@ -627,7 +628,8 @@ struct ParseTokens<Tokens>::bracket_pair_list_parser {
         if constexpr (std::is_same_v<next_token, RBrace>)
           return internal_result_t<elements_node, next_pos + 1>{};
         else
-          return error_result_t<"expects '" + Right::to_fixed_string() + "'">{};
+          return error_result_t<"expects '" + Right::to_fixed_string() + "'",
+                                next_pos>{};
       }
     }
   }
@@ -640,14 +642,14 @@ struct ParseTokens<Tokens>::member_parser {
   static consteval auto do_parse() noexcept {
     using lookahead = nth_token<Pos>;
     if constexpr (!detail::is_string_token<lookahead>)
-      return error_result_t<"expects String">{};
+      return error_result_t<"expects String", Pos>{};
     else
       return match_colon();
   }
   static consteval auto match_colon() noexcept {
     using lookahead = nth_token<Pos + 1>;
     if constexpr (!std::is_same_v<lookahead, Colon>)
-      return error_result_t<"expects ':'">{};
+      return error_result_t<"expects ':'", Pos + 1>{};
     else
       return match_value();
   }
@@ -657,7 +659,7 @@ struct ParseTokens<Tokens>::member_parser {
     if constexpr (detail::is_syntax_error<value_node>)
       return value_result{};
     else
-      return internal_result_t<Member<nth_token<Pos>::value_result, value_node>,
+      return internal_result_t<Member<nth_token<Pos>::value, value_node>,
                                value_result::next_pos>{};
   }
   using result = decltype(do_parse());
@@ -702,7 +704,7 @@ struct parse {
       if constexpr (detail::is_syntax_error<root_node>)
         return root_node{};
       else if constexpr (next_pos < tokenize_result::size)
-        return SyntaxError<"expects end of string">{};
+        return SyntaxError<"expects end of string", next_pos>{};
       else
         return root_node{};
     }
