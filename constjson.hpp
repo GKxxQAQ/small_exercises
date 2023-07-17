@@ -65,26 +65,47 @@ namespace gkxx::constjson {
 template <int N>
 struct Integer {
   static constexpr int value = N;
+  static constexpr auto to_string() {
+    return std::to_string(value);
+  }
+  static constexpr auto to_pretty_string(std::size_t indent) {
+    return std::string(indent, ' ') + "Int<" + std::to_string(value) + ">";
+  }
 };
 
 template <fixed_string S>
 struct String {
   static constexpr fixed_string value = S;
+  static constexpr auto to_string() {
+    return value.to_string();
+  }
+  static constexpr auto to_pretty_string(std::size_t indent) {
+    return std::string(indent, ' ') + "String<" + value.to_string() + ">";
+  }
 };
 
 struct True {
   static constexpr auto to_fixed_string() noexcept {
     return fixed_string("true");
   }
+  static constexpr auto to_pretty_string(std::size_t indent) {
+    return std::string(indent, ' ') + "True";
+  }
 };
 struct False {
   static constexpr auto to_fixed_string() noexcept {
     return fixed_string("false");
   }
+  static constexpr auto to_pretty_string(std::size_t indent) {
+    return std::string(indent, ' ') + "False";
+  }
 };
 struct Null {
   static constexpr auto to_fixed_string() noexcept {
     return fixed_string("null");
+  }
+  static constexpr auto to_pretty_string(std::size_t indent) {
+    return std::string(indent, ' ') + "Null";
   }
 };
 
@@ -199,7 +220,7 @@ struct Tokenizer {
   struct token_getter;
 
   template <std::size_t Pos, CToken... CurrentTokens>
-  struct parser {
+  struct lexer {
     // Src[Pos] is non-whitespace
     using token_getter = typename token_getter<Pos>::result;
     using new_token = typename token_getter::token;
@@ -209,16 +230,16 @@ struct Tokenizer {
       if constexpr (detail::is_error_token<new_token>)
         return new_token{};
       else
-        return typename parser<next_pos, CurrentTokens..., new_token>::result{};
+        return typename lexer<next_pos, CurrentTokens..., new_token>::result{};
     }
     using result = decltype(get_result());
   };
   template <CToken... Tokens>
-  struct parser<Src.size(), Tokens...> {
+  struct lexer<Src.size(), Tokens...> {
     using result = TokenSequence<Tokens...>;
   };
 
-  using result = parser<next_nonwhitespace_pos<0>::result>::result;
+  using result = lexer<next_nonwhitespace_pos<0>::result>::result;
 };
 
 template <fixed_string Src>
@@ -427,13 +448,54 @@ values  -> {value}
  */
 
 template <typename... Members>
-struct Object {};
+struct Object {
+  static constexpr auto to_pretty_string(std::size_t indent) {
+    return std::string(indent, ' ') + "Object<\n" +
+           (... + Members::to_pretty_string(indent + 2)) +
+           std::string(indent, ' ') + ">\n";
+  }
+};
 
 template <typename... Values>
-struct Array {};
+struct Array {
+  template <typename...>
+  struct make_comma_sep_list;
+
+  template <typename First, typename... Rest>
+  struct make_comma_sep_list<First, Rest...> {
+    constexpr auto operator()(std::size_t indent) {
+      return First::to_pretty_string(indent) +
+             (... + (", " + Rest::to_pretty_string(indent)));
+    }
+  };
+
+  template <typename First>
+  struct make_comma_sep_list<First> {
+    constexpr auto operator()(std::size_t indent) {
+      return First::to_pretty_string(indent);
+    }
+  };
+
+  template <>
+  struct make_comma_sep_list<> {
+    constexpr auto operator()([[maybe_unused]] std::size_t indent) {
+      return std::string{};
+    }
+  };
+
+  static constexpr auto to_pretty_string(std::size_t indent) {
+    return std::string(indent, ' ') + "Array<" +
+           make_comma_sep_list<Values...>{}(indent) + ">\n";
+  }
+};
 
 template <fixed_string Key, typename Value>
-struct Member {};
+struct Member {
+  static constexpr auto to_pretty_string(std::size_t indent) {
+    return std::string(indent, ' ') + "Member<" + Key.to_string() + ", " +
+           Value::to_pretty_string(indent) + ">\n";
+  }
+};
 
 struct EndOfTokens {};
 
@@ -475,7 +537,7 @@ struct ParseTokens {
       return typename Tokens::template nth<N>::type{};
     else
       return EndOfTokens{};
-  });
+  }());
 
   template <typename ParseResult,
             std::size_t NextPos = static_cast<std::size_t>(-1)>
@@ -625,6 +687,27 @@ struct ParseTokens<Tokens>::comma_list_parser {
     }
     using result = decltype(get_result());
   };
+};
+
+template <fixed_string JsonCode>
+struct parse {
+  static consteval auto get_result() noexcept {
+    using tokenize_result = Tokenizer<JsonCode>::result;
+    if constexpr (detail::is_error_token<tokenize_result>)
+      return tokenize_result{};
+    else {
+      using parse_result = typename ParseTokens<tokenize_result>::result;
+      using root_node = typename parse_result::node;
+      constexpr auto next_pos = parse_result::next_pos;
+      if constexpr (detail::is_syntax_error<root_node>)
+        return root_node{};
+      else if constexpr (next_pos < tokenize_result::size)
+        return SyntaxError<"expects end of string">{};
+      else
+        return root_node{};
+    }
+  }
+  using result = decltype(get_result());
 };
 
 } // namespace gkxx::constjson
