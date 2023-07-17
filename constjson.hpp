@@ -68,8 +68,9 @@ struct Integer {
   static constexpr auto to_string() {
     return std::to_string(value);
   }
-  static constexpr auto to_pretty_string(std::size_t indent) {
-    return std::string(indent, ' ') + "Int<" + std::to_string(value) + ">";
+  static constexpr auto
+  to_pretty_string([[maybe_unused]] std::size_t current_indent) {
+    return "Int<" + std::to_string(value) + ">";
   }
 };
 
@@ -79,8 +80,9 @@ struct String {
   static constexpr auto to_string() {
     return value.to_string();
   }
-  static constexpr auto to_pretty_string(std::size_t indent) {
-    return std::string(indent, ' ') + "String<" + value.to_string() + ">";
+  static constexpr auto
+  to_pretty_string([[maybe_unused]] std::size_t current_indent) {
+    return "String<\"" + value.to_string() + "\">";
   }
 };
 
@@ -88,24 +90,27 @@ struct True {
   static constexpr auto to_fixed_string() noexcept {
     return fixed_string("true");
   }
-  static constexpr auto to_pretty_string(std::size_t indent) {
-    return std::string(indent, ' ') + "True";
+  static constexpr auto
+  to_pretty_string([[maybe_unused]] std::size_t current_indent) {
+    return std::string("True");
   }
 };
 struct False {
   static constexpr auto to_fixed_string() noexcept {
     return fixed_string("false");
   }
-  static constexpr auto to_pretty_string(std::size_t indent) {
-    return std::string(indent, ' ') + "False";
+  static constexpr auto
+  to_pretty_string([[maybe_unused]] std::size_t current_indent) {
+    return std::string("False");
   }
 };
 struct Null {
   static constexpr auto to_fixed_string() noexcept {
     return fixed_string("null");
   }
-  static constexpr auto to_pretty_string(std::size_t indent) {
-    return std::string(indent, ' ') + "Null";
+  static constexpr auto
+  to_pretty_string([[maybe_unused]] std::size_t current_indent) {
+    return std::string("Null");
   }
 };
 
@@ -447,57 +452,51 @@ values  -> {value}
          | {value} Comma {values}
  */
 
-template <typename... Members>
-struct Object {
-  static constexpr auto to_pretty_string(std::size_t indent) {
-    return std::string(indent, ' ') + "Object<\n" +
-           (... + Members::to_pretty_string(indent + 2)) +
-           std::string(indent, ' ') + ">\n";
-  }
-};
-
 namespace detail {
 
-  template <typename...>
-  struct make_comma_sep_list;
-
-  template <typename First, typename... Rest>
-  struct make_comma_sep_list<First, Rest...> {
-    constexpr auto operator()(std::size_t indent) {
-      return First::to_pretty_string(indent) +
-             (... + (", " + Rest::to_pretty_string(indent)));
-    }
+  template <fixed_string Sep>
+  struct sep_helper {
+    std::string content;
   };
 
-  template <typename First>
-  struct make_comma_sep_list<First> {
-    constexpr auto operator()(std::size_t indent) {
-      return First::to_pretty_string(indent);
-    }
-  };
-
-  template <>
-  struct make_comma_sep_list<> {
-    constexpr auto operator()([[maybe_unused]] std::size_t indent) {
-      return std::string{};
-    }
-  };
+  template <fixed_string Sep>
+  inline constexpr sep_helper<Sep> operator+(const sep_helper<Sep> &lhs,
+                                             const sep_helper<Sep> &rhs) {
+    return {lhs.content + Sep.to_string() + rhs.content};
+  }
 
 } // namespace detail
 
+template <typename... Members>
+struct Object {
+  static constexpr auto to_pretty_string(std::size_t current_indent) {
+    return "Object<\n" +
+           (detail::sep_helper<",\n">{
+                Members::to_pretty_string(current_indent + 2)} +
+            ...)
+               .content +
+           '\n' + std::string(current_indent, ' ') + '>';
+  }
+};
+
 template <typename... Values>
 struct Array {
-  static constexpr auto to_pretty_string(std::size_t indent) {
-    return std::string(indent, ' ') + "Array<" +
-           detail::make_comma_sep_list<Values...>{}(indent) + ">\n";
+  static constexpr auto to_pretty_string(std::size_t current_indent) {
+    return "Array<\n" +
+           (detail::sep_helper<",\n">{
+                std::string(current_indent + 2, ' ') +
+                Values::to_pretty_string(current_indent + 2)} +
+            ...)
+               .content +
+           '\n' + std::string(current_indent, ' ') + '>';
   }
 };
 
 template <fixed_string Key, typename Value>
 struct Member {
-  static constexpr auto to_pretty_string(std::size_t indent) {
-    return std::string(indent, ' ') + "Member<" + Key.to_string() + ", " +
-           Value::to_pretty_string(indent) + ">\n";
+  static constexpr auto to_pretty_string(std::size_t current_indent) {
+    return std::string(current_indent, ' ') + "Member<\"" + Key.to_string() +
+           "\", " + Value::to_pretty_string(current_indent) + '>';
   }
 };
 
@@ -631,7 +630,7 @@ struct ParseTokens<Tokens>::bracket_pair_list_parser {
       else {
         constexpr auto next_pos = elements_result::next_pos;
         using next_token = nth_token<next_pos>;
-        if constexpr (std::is_same_v<next_token, RBrace>)
+        if constexpr (std::is_same_v<next_token, Right>)
           return internal_result_t<elements_node, next_pos + 1>{};
         else
           return error_result_t<"expects '" + Right::to_fixed_string() + "'",
