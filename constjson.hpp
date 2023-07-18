@@ -400,7 +400,22 @@ namespace detect {
 template <typename T>
 concept CMember = detect::is_member<T>;
 
+namespace detail {
+
+  template <auto...>
+  inline constexpr auto has_duplicate = false;
+
+  template <auto Only>
+  inline constexpr auto has_duplicate<Only> = false;
+
+  template <auto First, auto... Rest>
+  inline constexpr auto has_duplicate<First, Rest...> =
+      ((First == Rest) || ...) || has_duplicate<Rest...>;
+
+} // namespace detail
+
 template <CMember... Members>
+  requires(!detail::has_duplicate<Members::key...>)
 struct Object {
   static constexpr auto to_string() {
     if constexpr (sizeof...(Members) == 0)
