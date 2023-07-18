@@ -512,7 +512,7 @@ struct ParseTokens {
   template <std::size_t Pos>
   struct member_parser;
 
-  template <std::size_t Pos, template <std::size_t> typename element_parser,
+  template <std::size_t Pos, template <std::size_t> typename ElementParser,
             template <typename...> typename ListType>
   struct comma_list_parser;
 
@@ -620,25 +620,36 @@ struct ParseTokens<Tokens>::member_parser {
 };
 
 template <meta::specialization_of<TokenSequence> Tokens>
-template <std::size_t Pos, template <std::size_t> typename element_parser,
+template <std::size_t Pos, template <std::size_t> typename ElementParser,
           template <typename...> typename ListType>
 struct ParseTokens<Tokens>::comma_list_parser {
   template <std::size_t CurPos, typename... CurElems>
   struct parse {
+    template <typename MaybeMember>
+    static consteval bool duplicate_object_key() noexcept {
+      if constexpr (std::is_same_v<ListType<>, Object<>>)
+        return (... || (MaybeMember::key == CurElems::key));
+      else
+        return false;
+    }
     static consteval auto get_result() noexcept {
-      using new_elem_result = typename element_parser<CurPos>::result;
+      using new_elem_result = typename ElementParser<CurPos>::result;
       using new_elem_node = typename new_elem_result::node;
       if constexpr (detect::is_syntax_error<new_elem_node>)
         return new_elem_result{};
       else {
-        constexpr auto next_pos = new_elem_result::next_pos;
-        using next_token = nth_token<next_pos>;
-        if constexpr (std::is_same_v<next_token, Comma>)
-          return typename parse<next_pos + 1, CurElems...,
-                                new_elem_node>::result{};
-        else
-          return internal_result_t<ListType<CurElems..., new_elem_node>,
-                                   next_pos>{};
+        if constexpr (duplicate_object_key<new_elem_node>())
+          return error_result_t<"duplicate object key", CurPos>{};
+        else {
+          constexpr auto next_pos = new_elem_result::next_pos;
+          using next_token = nth_token<next_pos>;
+          if constexpr (std::is_same_v<next_token, Comma>)
+            return typename parse<next_pos + 1, CurElems...,
+                                  new_elem_node>::result{};
+          else
+            return internal_result_t<ListType<CurElems..., new_elem_node>,
+                                     next_pos>{};
+        }
       }
     }
     using result = decltype(get_result());
