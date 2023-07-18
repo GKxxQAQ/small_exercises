@@ -651,7 +651,7 @@ namespace pretty {
   template <int N>
   struct type_name<Integer<N>> {
     static constexpr auto get([[maybe_unused]] std::size_t indent) {
-      return "Int<" + std::to_string(N) + ">";
+      return "Integer<" + std::to_string(N) + ">";
     }
   };
 
