@@ -467,6 +467,17 @@ struct Array {
                  .content +
              "]";
   }
+
+ private:
+  template <std::size_t N>
+    requires (N < sizeof...(Values))
+  struct get_impl {
+    using result = std::decay_t<decltype(std::get<N>(std::tuple<Values...>{}))>;
+  };
+
+ public:
+  template <std::size_t N>
+  using get = typename get_impl<N>::result;
 };
 
 namespace detect {

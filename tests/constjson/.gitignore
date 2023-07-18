@@ -3,4 +3,5 @@ parse
 generate
 duplicate_key
 object_get
+array_get
 *.json
