@@ -1,4 +1,5 @@
 #include "../../constjson.hpp"
+#include "../../type_name.hpp"
 
 #include <iostream>
 
@@ -66,6 +67,7 @@ int main() {
   std::cout << pretty_type_name<array>() << std::endl;
 
   using cppconfig_result = parse<cppconfig>::result;
+  std::cout << gkxx::get_type_name<cppconfig_result>() << std::endl;
   std::cout << pretty_type_name<cppconfig_result>() << std::endl;
 
   using tasks_result = parse<tasks>::result;
