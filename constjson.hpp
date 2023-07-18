@@ -104,7 +104,14 @@ namespace detect {
   template <fixed_string Msg, std::size_t Pos>
   inline constexpr auto is_error_token<ErrorToken<Msg, Pos>> = true;
 
+  template <typename T>
+  inline constexpr auto is_value =
+      is_integer_token<T> || is_string_token<T> || is_keyword_token<T>;
+
 } // namespace detect
+
+template <typename T>
+concept CValue = detect::is_value<T>;
 
 template <typename T>
 concept CToken = detect::is_integer_token<T> || detect::is_string_token<T> ||
@@ -384,7 +391,17 @@ namespace detail {
 
 } // namespace detail
 
-template <typename... Members>
+namespace detect {
+
+  template <typename T>
+  inline constexpr auto is_member = false;
+
+} // namespace detect
+
+template <typename T>
+concept CMember = detect::is_member<T>;
+
+template <CMember... Members>
 struct Object {
   static constexpr auto to_string() {
     if constexpr (sizeof...(Members) == 0)
@@ -397,7 +414,7 @@ struct Object {
   }
 };
 
-template <typename... Values>
+template <CValue... Values>
 struct Array {
   static constexpr auto to_string() {
     if constexpr (sizeof...(Values) == 0)
@@ -410,13 +427,23 @@ struct Array {
   }
 };
 
+namespace detect {
+
+  template <CMember... Members>
+  inline constexpr auto is_value<Object<Members...>> = true;
+
+  template <CValue... Values>
+  inline constexpr auto is_value<Array<Values...>> = true;
+
+} // namespace detect
+
 template <fixed_string... Ss>
 using ArrayStr = Array<String<Ss>...>;
 
 template <int... Ns>
 using ArrayInt = Array<Integer<Ns>...>;
 
-template <fixed_string Key, typename Value>
+template <fixed_string Key, CValue Value>
 struct Member {
   static constexpr fixed_string key = Key;
   using value = Value;
@@ -435,10 +462,7 @@ struct SyntaxError {
 
 namespace detect {
 
-  template <typename T>
-  inline constexpr auto is_member = false;
-
-  template <fixed_string Key, typename Value>
+  template <fixed_string Key, CValue Value>
   inline constexpr auto is_member<Member<Key, Value>> = true;
 
   template <typename T>
@@ -452,10 +476,8 @@ namespace detect {
 
 } // namespace detect
 
-template <typename Tokens>
+template <meta::specialization_of<TokenSequence> Tokens>
 struct ParseTokens {
-  static_assert(meta::specialization_of<Tokens, TokenSequence>);
-
   template <std::size_t N>
   struct nth_token_impl {
     static constexpr auto get_result() noexcept {
@@ -513,7 +535,7 @@ struct ParseTokens {
   using result = typename value_parser<0>::result;
 };
 
-template <typename Tokens>
+template <meta::specialization_of<TokenSequence> Tokens>
 template <std::size_t Pos>
 struct ParseTokens<Tokens>::value_parser {
   static consteval auto do_parse() noexcept {
@@ -532,7 +554,7 @@ struct ParseTokens<Tokens>::value_parser {
   using result = decltype(do_parse());
 };
 
-template <typename Tokens>
+template <meta::specialization_of<TokenSequence> Tokens>
 template <std::size_t Pos, typename Left, typename Right,
           template <std::size_t> typename list_parser>
 struct ParseTokens<Tokens>::bracket_pair_list_parser {
@@ -566,7 +588,7 @@ struct ParseTokens<Tokens>::bracket_pair_list_parser {
   using result = decltype(do_parse());
 };
 
-template <typename Tokens>
+template <meta::specialization_of<TokenSequence> Tokens>
 template <std::size_t Pos>
 struct ParseTokens<Tokens>::member_parser {
   static consteval auto do_parse() noexcept {
@@ -595,7 +617,7 @@ struct ParseTokens<Tokens>::member_parser {
   using result = decltype(do_parse());
 };
 
-template <typename Tokens>
+template <meta::specialization_of<TokenSequence> Tokens>
 template <std::size_t Pos, template <std::size_t> typename element_parser,
           template <typename...> typename list_type>
 struct ParseTokens<Tokens>::comma_list_parser {
@@ -689,7 +711,7 @@ namespace pretty {
     }
   };
 
-  template <typename... Members>
+  template <CMember... Members>
   struct type_name<Object<Members...>> {
     static constexpr auto get([[maybe_unused]] std::size_t indent) {
       if constexpr (sizeof...(Members) == 0)
@@ -704,7 +726,7 @@ namespace pretty {
     }
   };
 
-  template <typename... Values>
+  template <CValue... Values>
   struct type_name<Array<Values...>> {
     static constexpr auto get([[maybe_unused]] std::size_t indent) {
       if constexpr (sizeof...(Values) == 0)
@@ -719,7 +741,7 @@ namespace pretty {
     }
   };
 
-  template <fixed_string Key, typename Value>
+  template <fixed_string Key, CValue Value>
   struct type_name<Member<Key, Value>> {
     static constexpr auto get([[maybe_unused]] std::size_t indent) {
       return indents(indent) + "Member<\"" + Key.to_string() + "\", " +
