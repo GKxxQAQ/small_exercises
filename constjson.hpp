@@ -129,7 +129,6 @@ struct TokenSequence {
   static constexpr auto empty = (sizeof...(Tokens) == 0);
   static constexpr auto size = sizeof...(Tokens);
   template <std::size_t N>
-    requires(N < size)
   struct nth {
     using type = std::decay_t<decltype(std::get<N>(std::tuple<Tokens...>{}))>;
   };
