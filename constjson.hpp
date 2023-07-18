@@ -26,10 +26,6 @@ struct Integer {
   static constexpr auto to_string() {
     return std::to_string(value);
   }
-  static constexpr auto
-  to_pretty_string([[maybe_unused]] std::size_t current_indent) {
-    return "Int<" + std::to_string(value) + ">";
-  }
 };
 
 template <fixed_string S>
@@ -38,70 +34,38 @@ struct String {
   static constexpr auto to_string() {
     return value.to_string();
   }
-  static constexpr auto
-  to_pretty_string([[maybe_unused]] std::size_t current_indent) {
-    return "String<\"" + value.to_string() + "\">";
+};
+
+template <fixed_string S>
+struct KeywordToken {
+  static constexpr auto to_fixed_string() noexcept {
+    return S;
+  }
+  static constexpr auto to_string() {
+    return S.to_string();
   }
 };
 
-struct True {
+using True = KeywordToken<"true">;
+using False = KeywordToken<"false">;
+using Null = KeywordToken<"null">;
+
+template <char C>
+struct PunctToken {
   static constexpr auto to_fixed_string() noexcept {
-    return fixed_string("true");
+    return fixed_string({C, 0});
   }
-  static constexpr auto
-  to_pretty_string([[maybe_unused]] std::size_t current_indent) {
-    return std::string("True");
-  }
-};
-struct False {
-  static constexpr auto to_fixed_string() noexcept {
-    return fixed_string("false");
-  }
-  static constexpr auto
-  to_pretty_string([[maybe_unused]] std::size_t current_indent) {
-    return std::string("False");
-  }
-};
-struct Null {
-  static constexpr auto to_fixed_string() noexcept {
-    return fixed_string("null");
-  }
-  static constexpr auto
-  to_pretty_string([[maybe_unused]] std::size_t current_indent) {
-    return std::string("Null");
+  static constexpr auto to_string() {
+    return std::string(1, C);
   }
 };
 
-struct LBrace {
-  static constexpr auto to_fixed_string() noexcept {
-    return fixed_string("{");
-  }
-};
-struct RBrace {
-  static constexpr auto to_fixed_string() noexcept {
-    return fixed_string("}");
-  }
-};
-struct LBracket {
-  static constexpr auto to_fixed_string() noexcept {
-    return fixed_string("[");
-  }
-};
-struct RBracket {
-  static constexpr auto to_fixed_string() noexcept {
-    return fixed_string("]");
-  }
-};
-struct Comma {
-  static constexpr auto to_fixed_string() noexcept {
-    return fixed_string(",");
-  }
-};
-struct Colon {
-  static constexpr auto to_fixed_string() noexcept {
-    return fixed_string(":");
-  }
-};
+using LBrace = PunctToken<'{'>;
+using RBrace = PunctToken<'}'>;
+using LBracket = PunctToken<'['>;
+using RBracket = PunctToken<']'>;
+using Comma = PunctToken<','>;
+using Colon = PunctToken<':'>;
 
 template <fixed_string Msg, std::size_t Pos>
 struct ErrorToken {
@@ -109,7 +73,7 @@ struct ErrorToken {
   static constexpr std::size_t position = Pos;
 };
 
-namespace detail {
+namespace detect {
 
   template <typename T>
   inline constexpr auto is_integer_token = false;
@@ -122,33 +86,38 @@ namespace detail {
   inline constexpr auto is_string_token<String<S>> = true;
 
   template <typename T>
+  inline constexpr auto is_keyword_token = false;
+  template <fixed_string S>
+  inline constexpr auto is_keyword_token<KeywordToken<S>> = true;
+
+  template <typename T>
+  inline constexpr auto is_punct_token = false;
+  template <char C>
+  inline constexpr auto is_punct_token<PunctToken<C>> = true;
+
+  template <typename T>
   inline constexpr auto is_error_token = false;
   template <fixed_string Msg, std::size_t Pos>
   inline constexpr auto is_error_token<ErrorToken<Msg, Pos>> = true;
 
-  template <typename T, typename... Types>
-  concept same_as_any = (... || std::same_as<T, Types>);
-
-} // namespace detail
+} // namespace detect
 
 template <typename T>
-concept CToken = detail::same_as_any<T, True, False, Null, LBrace, RBrace,
-                                     LBracket, RBracket, Comma, Colon> ||
-                 detail::is_integer_token<T> || detail::is_string_token<T> ||
-                 detail::is_error_token<T>;
+concept CToken = detect::is_integer_token<T> || detect::is_string_token<T> ||
+                 detect::is_keyword_token<T> || detect::is_punct_token<T> ||
+                 detect::is_error_token<T>;
 
 template <CToken... Tokens>
 struct TokenSequence {
   static constexpr std::string reconstruct_string() {
     auto to_string = []<typename T>(T *) -> std::string {
-      if constexpr (detail::is_integer_token<T>)
+      if constexpr (detect::is_integer_token<T>)
         return std::to_string(T::value);
-      else if constexpr (detail::is_string_token<T>)
+      else if constexpr (detect::is_string_token<T>)
         return "\"" + T::value.to_string() + "\"";
-      else if constexpr (detail::same_as_any<T, True, False, Null, LBrace,
-                                             RBrace, LBracket, RBracket, Comma,
-                                             Colon>)
-        return T::to_fixed_string().to_string();
+      else if constexpr (detect::is_keyword_token<T> ||
+                         detect::is_punct_token<T>)
+        return T::to_string();
       else
         return "<Error token: " + T::message.to_string() + " at index " +
                std::to_string(T::position) + ">";
@@ -193,7 +162,7 @@ struct Tokenizer {
     static constexpr auto next_pos =
         next_nonwhitespace_pos<token_getter::end_pos>::result;
     static consteval auto get_result() noexcept {
-      if constexpr (detail::is_error_token<new_token>)
+      if constexpr (detect::is_error_token<new_token>)
         return new_token{};
       else
         return typename lexer<next_pos, CurrentTokens..., new_token>::result{};
@@ -227,7 +196,7 @@ struct Tokenizer<Src>::token_getter {
                 "token_getter encounters a whitespace");
 
   template <CToken Token, std::size_t EndPos = static_cast<std::size_t>(-1)>
-    requires(!(!detail::is_error_token<Token> &&
+    requires(!(!detect::is_error_token<Token> &&
                EndPos == static_cast<std::size_t>(-1)))
   struct internal_result_t {
     using token = Token;
@@ -407,52 +376,16 @@ values  -> {value}
          | {value} Comma {values}
  */
 
-namespace detail {
-
-  template <fixed_string Sep>
-  struct sep_helper {
-    std::string content;
-  };
-
-  template <fixed_string Sep>
-  inline constexpr sep_helper<Sep> operator+(const sep_helper<Sep> &lhs,
-                                             const sep_helper<Sep> &rhs) {
-    return {lhs.content + Sep.to_string() + rhs.content};
-  }
-
-} // namespace detail
-
 template <typename... Members>
-struct Object {
-  static constexpr auto to_pretty_string(std::size_t current_indent) {
-    return "Object<\n" +
-           (detail::sep_helper<",\n">{
-                Members::to_pretty_string(current_indent + 2)} +
-            ...)
-               .content +
-           '\n' + std::string(current_indent, ' ') + '>';
-  }
-};
+struct Object {};
 
 template <typename... Values>
-struct Array {
-  static constexpr auto to_pretty_string(std::size_t current_indent) {
-    return "Array<\n" +
-           (detail::sep_helper<",\n">{
-                std::string(current_indent + 2, ' ') +
-                Values::to_pretty_string(current_indent + 2)} +
-            ...)
-               .content +
-           '\n' + std::string(current_indent, ' ') + '>';
-  }
-};
+struct Array {};
 
 template <fixed_string Key, typename Value>
 struct Member {
-  static constexpr auto to_pretty_string(std::size_t current_indent) {
-    return std::string(current_indent, ' ') + "Member<\"" + Key.to_string() +
-           "\", " + Value::to_pretty_string(current_indent) + '>';
-  }
+  static constexpr fixed_string key = Key;
+  using value = Value;
 };
 
 struct EndOfTokens {};
@@ -463,7 +396,7 @@ struct SyntaxError {
   static constexpr std::size_t position = Pos;
 };
 
-namespace detail {
+namespace detect {
 
   template <typename T>
   inline constexpr auto is_member = false;
@@ -477,10 +410,10 @@ namespace detail {
   inline constexpr auto is_syntax_error<SyntaxError<Msg, Pos>> = true;
 
   template <typename T>
-  concept CTerminal = is_string_token<T> || is_integer_token<T> ||
-                      same_as_any<T, True, False, Null>;
+  inline constexpr auto is_terminal =
+      is_string_token<T> || is_integer_token<T> || is_keyword_token<T>;
 
-} // namespace detail
+} // namespace detect
 
 template <typename Tokens>
 struct ParseTokens {
@@ -502,7 +435,7 @@ struct ParseTokens {
 
   template <typename ParseResult,
             std::size_t NextPos = static_cast<std::size_t>(-1)>
-    requires(!(!detail::is_syntax_error<ParseResult> &&
+    requires(!(!detect::is_syntax_error<ParseResult> &&
                NextPos == static_cast<std::size_t>(-1)))
   struct internal_result_t {
     using node = ParseResult;
@@ -555,7 +488,7 @@ struct ParseTokens<Tokens>::value_parser {
     else if constexpr (std::is_same_v<lookahead, LBracket>)
       return typename array_parser<Pos>::result{};
     else {
-      static_assert(detail::CTerminal<lookahead>);
+      static_assert(detect::is_terminal<lookahead>);
       return internal_result_t<lookahead, Pos + 1>{};
     }
   }
@@ -580,7 +513,7 @@ struct ParseTokens<Tokens>::bracket_pair_list_parser {
     else {
       using elements_result = typename list_parser<Pos + 1>::result;
       using elements_node = typename elements_result::node;
-      if constexpr (detail::is_syntax_error<elements_node>)
+      if constexpr (detect::is_syntax_error<elements_node>)
         return elements_result{};
       else {
         constexpr auto next_pos = elements_result::next_pos;
@@ -601,7 +534,7 @@ template <std::size_t Pos>
 struct ParseTokens<Tokens>::member_parser {
   static consteval auto do_parse() noexcept {
     using lookahead = nth_token<Pos>;
-    if constexpr (!detail::is_string_token<lookahead>)
+    if constexpr (!detect::is_string_token<lookahead>)
       return error_result_t<"expects String", Pos>{};
     else
       return match_colon();
@@ -616,7 +549,7 @@ struct ParseTokens<Tokens>::member_parser {
   static consteval auto match_value() noexcept {
     using value_result = typename value_parser<Pos + 2>::result;
     using value_node = typename value_result::node;
-    if constexpr (detail::is_syntax_error<value_node>)
+    if constexpr (detect::is_syntax_error<value_node>)
       return value_result{};
     else
       return internal_result_t<Member<nth_token<Pos>::value, value_node>,
@@ -634,7 +567,7 @@ struct ParseTokens<Tokens>::comma_list_parser {
     static consteval auto get_result() noexcept {
       using new_elem_result = typename element_parser<CurPos>::result;
       using new_elem_node = typename new_elem_result::node;
-      if constexpr (detail::is_syntax_error<new_elem_node>)
+      if constexpr (detect::is_syntax_error<new_elem_node>)
         return new_elem_result{};
       else {
         constexpr auto next_pos = new_elem_result::next_pos;
@@ -656,13 +589,13 @@ template <fixed_string JsonCode>
 struct parse {
   static consteval auto get_result() noexcept {
     using tokenize_result = Tokenizer<JsonCode>::result;
-    if constexpr (detail::is_error_token<tokenize_result>)
+    if constexpr (detect::is_error_token<tokenize_result>)
       return tokenize_result{};
     else {
       using parse_result = typename ParseTokens<tokenize_result>::result;
       using root_node = typename parse_result::node;
       constexpr auto next_pos = parse_result::next_pos;
-      if constexpr (detail::is_syntax_error<root_node>)
+      if constexpr (detect::is_syntax_error<root_node>)
         return root_node{};
       else if constexpr (next_pos < tokenize_result::size)
         return SyntaxError<"expects end of string", next_pos>{};
@@ -672,6 +605,100 @@ struct parse {
   }
   using result = decltype(get_result());
 };
+
+namespace pretty {
+
+  using namespace std::string_literals;
+
+  inline constexpr auto indents(std::size_t n) {
+    return std::string(n, ' ');
+  }
+
+  template <fixed_string Sep>
+  struct sep_helper {
+    std::string content;
+  };
+
+  template <fixed_string Sep>
+  inline constexpr sep_helper<Sep> operator+(const sep_helper<Sep> &lhs,
+                                             const sep_helper<Sep> &rhs) {
+    return {lhs.content + Sep.to_string() + rhs.content};
+  }
+
+  template <typename T>
+  struct type_name;
+
+  template <int N>
+  struct type_name<Integer<N>> {
+    static constexpr auto get([[maybe_unused]] std::size_t indent) {
+      return "Int<" + std::to_string(N) + ">";
+    }
+  };
+
+  template <fixed_string S>
+  struct type_name<String<S>> {
+    static constexpr auto get([[maybe_unused]] std::size_t indent) {
+      return "String<\"" + S.to_string() + "\">";
+    }
+  };
+
+  template <>
+  struct type_name<True> {
+    static constexpr auto get([[maybe_unused]] std::size_t indent) {
+      return "True"s;
+    }
+  };
+
+  template <>
+  struct type_name<False> {
+    static constexpr auto get([[maybe_unused]] std::size_t indent) {
+      return "False"s;
+    }
+  };
+
+  template <>
+  struct type_name<Null> {
+    static constexpr auto get([[maybe_unused]] std::size_t indent) {
+      return "Null"s;
+    }
+  };
+
+  template <typename... Members>
+  struct type_name<Object<Members...>> {
+    static constexpr auto get([[maybe_unused]] std::size_t indent) {
+      return "Object<\n" +
+             (sep_helper<",\n">{type_name<Members>::get(indent + 2)} + ...)
+                 .content +
+             '\n' + indents(indent) + '>';
+    }
+  };
+
+  template <typename... Values>
+  struct type_name<Array<Values...>> {
+    static constexpr auto get([[maybe_unused]] std::size_t indent) {
+      return "Array<\n" +
+             (sep_helper<",\n">{indents(indent + 2) +
+                                type_name<Values>::get(indent + 2)} +
+              ...)
+                 .content +
+             '\n' + indents(indent) + '>';
+    }
+  };
+
+  template <fixed_string Key, typename Value>
+  struct type_name<Member<Key, Value>> {
+    static constexpr auto get([[maybe_unused]] std::size_t indent) {
+      return indents(indent) + "Member<\"" + Key.to_string() + "\", " +
+             type_name<Value>::get(indent) + '>';
+    }
+  };
+
+} // namespace pretty
+
+template <typename T>
+static constexpr auto pretty_type_name() {
+  return pretty::type_name<T>::get(0);
+}
 
 } // namespace gkxx::constjson
 
