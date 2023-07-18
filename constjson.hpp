@@ -410,6 +410,12 @@ struct Array {
   }
 };
 
+template <fixed_string... Ss>
+using ArrayStr = Array<String<Ss>...>;
+
+template <int... Ns>
+using ArrayInt = Array<Integer<Ns>...>;
+
 template <fixed_string Key, typename Value>
 struct Member {
   static constexpr fixed_string key = Key;
