@@ -2,4 +2,5 @@ tokenizer
 parse
 generate
 duplicate_key
+object_get
 *.json

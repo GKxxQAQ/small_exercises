@@ -426,6 +426,34 @@ struct Object {
                  .content +
              "}";
   }
+
+ private:
+  template <typename... Ms>
+  static constexpr auto required_key_exists = (sizeof...(Ms) > 0);
+
+  template <fixed_string K, typename... Ms>
+    requires required_key_exists<Ms...>
+  struct get_impl;
+
+  template <fixed_string K>
+  struct get_impl<K> {
+    using result = void;
+  };
+
+  template <fixed_string K, typename M, typename... Ms>
+  struct get_impl<K, M, Ms...> {
+    static consteval auto helper() noexcept {
+      if constexpr (K == M::key)
+        return typename M::value{};
+      else
+        return typename get_impl<K, Ms...>::result{};
+    }
+    using result = decltype(helper());
+  };
+
+ public:
+  template <fixed_string Key>
+  using get = typename get_impl<Key, Members...>::result;
 };
 
 template <CValue... Values>
