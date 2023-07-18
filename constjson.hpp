@@ -692,24 +692,12 @@ namespace pretty {
     }
   };
 
-  template <>
-  struct type_name<True> {
+  template <fixed_string S>
+  struct type_name<KeywordToken<S>> {
     static constexpr auto get([[maybe_unused]] std::size_t indent) {
-      return "True"s;
-    }
-  };
-
-  template <>
-  struct type_name<False> {
-    static constexpr auto get([[maybe_unused]] std::size_t indent) {
-      return "False"s;
-    }
-  };
-
-  template <>
-  struct type_name<Null> {
-    static constexpr auto get([[maybe_unused]] std::size_t indent) {
-      return "Null"s;
+      auto keyword = KeywordToken<S>::to_string();
+      keyword.front() -= 'a' - 'A';
+      return keyword;
     }
   };
 
