@@ -32,7 +32,7 @@ template <fixed_string S>
 struct String {
   static constexpr fixed_string value = S;
   static constexpr auto to_string() {
-    return value.to_string();
+    return "\"" + value.to_string() + "\"";
   }
 };
 
@@ -71,6 +71,10 @@ template <fixed_string Msg, std::size_t Pos>
 struct ErrorToken {
   static constexpr fixed_string message = Msg;
   static constexpr std::size_t position = Pos;
+  static constexpr auto to_string() {
+    return "<Error Token: " + message.to_string() + " at index " +
+           std::to_string(position) + '>';
+  }
 };
 
 namespace detect {
@@ -110,22 +114,10 @@ concept CToken = detect::is_integer_token<T> || detect::is_string_token<T> ||
 template <CToken... Tokens>
 struct TokenSequence {
   static constexpr std::string reconstruct_string() {
-    auto to_string = []<typename T>(T *) -> std::string {
-      if constexpr (detect::is_integer_token<T>)
-        return std::to_string(T::value);
-      else if constexpr (detect::is_string_token<T>)
-        return "\"" + T::value.to_string() + "\"";
-      else if constexpr (detect::is_keyword_token<T> ||
-                         detect::is_punct_token<T>)
-        return T::to_string();
-      else
-        return "<Error token: " + T::message.to_string() + " at index " +
-               std::to_string(T::position) + ">";
-    };
     if constexpr (empty)
       return {};
     else
-      return (... + to_string(static_cast<Tokens *>(nullptr)));
+      return (... + Tokens::to_string());
   }
   static constexpr auto empty = (sizeof...(Tokens) == 0);
   static constexpr auto size = sizeof...(Tokens);
@@ -376,16 +368,55 @@ values  -> {value}
          | {value} Comma {values}
  */
 
+namespace detail {
+
+  template <fixed_string Sep>
+  struct separated_string {
+    std::string content;
+  };
+
+  template <fixed_string Sep>
+  inline constexpr separated_string<Sep>
+  operator+(const separated_string<Sep> &lhs,
+            const separated_string<Sep> &rhs) {
+    return {lhs.content + Sep.to_string() + rhs.content};
+  }
+
+} // namespace detail
+
 template <typename... Members>
-struct Object {};
+struct Object {
+  static constexpr auto to_string() {
+    if constexpr (sizeof...(Members) == 0)
+      return "{}";
+    else
+      return "{" +
+             (detail::separated_string<", ">{Members::to_string()} + ...)
+                 .content +
+             "}";
+  }
+};
 
 template <typename... Values>
-struct Array {};
+struct Array {
+  static constexpr auto to_string() {
+    if constexpr (sizeof...(Values) == 0)
+      return "[]";
+    else
+      return "[" +
+             (detail::separated_string<", ">{Values::to_string()} + ...)
+                 .content +
+             "]";
+  }
+};
 
 template <fixed_string Key, typename Value>
 struct Member {
   static constexpr fixed_string key = Key;
   using value = Value;
+  static constexpr auto to_string() {
+    return "\"" + Key.to_string() + "\": " + Value::to_string();
+  }
 };
 
 struct EndOfTokens {};
@@ -614,17 +645,6 @@ namespace pretty {
     return std::string(n, ' ');
   }
 
-  template <fixed_string Sep>
-  struct sep_helper {
-    std::string content;
-  };
-
-  template <fixed_string Sep>
-  inline constexpr sep_helper<Sep> operator+(const sep_helper<Sep> &lhs,
-                                             const sep_helper<Sep> &rhs) {
-    return {lhs.content + Sep.to_string() + rhs.content};
-  }
-
   template <typename T>
   struct type_name;
 
@@ -666,22 +686,30 @@ namespace pretty {
   template <typename... Members>
   struct type_name<Object<Members...>> {
     static constexpr auto get([[maybe_unused]] std::size_t indent) {
-      return "Object<\n" +
-             (sep_helper<",\n">{type_name<Members>::get(indent + 2)} + ...)
-                 .content +
-             '\n' + indents(indent) + '>';
+      if constexpr (sizeof...(Members) == 0)
+        return "Object<>";
+      else
+        return "Object<\n" +
+               (detail::separated_string<",\n">{
+                    type_name<Members>::get(indent + 2)} +
+                ...)
+                   .content +
+               '\n' + indents(indent) + '>';
     }
   };
 
   template <typename... Values>
   struct type_name<Array<Values...>> {
     static constexpr auto get([[maybe_unused]] std::size_t indent) {
-      return "Array<\n" +
-             (sep_helper<",\n">{indents(indent + 2) +
-                                type_name<Values>::get(indent + 2)} +
-              ...)
-                 .content +
-             '\n' + indents(indent) + '>';
+      if constexpr (sizeof...(Values) == 0)
+        return "Array<>";
+      else
+        return "Array<\n" +
+               (detail::separated_string<",\n">{
+                    indents(indent + 2) + type_name<Values>::get(indent + 2)} +
+                ...)
+                   .content +
+               '\n' + indents(indent) + '>';
     }
   };
 
