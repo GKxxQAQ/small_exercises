@@ -59,7 +59,7 @@ constexpr const char tasks[] = R"(
 int main() {
   using namespace gkxx::constjson;
 
-  using empty_object = parse<"{\"a\": 1}">::result;
+  using empty_object = parse<"{}">::result;
   std::cout << pretty_type_name<empty_object>() << std::endl;
 
   using array = parse<"[\"a\", \"b\"]">::result;
