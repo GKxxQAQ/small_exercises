@@ -60,11 +60,11 @@ constexpr const char tasks[] = R"(
 int main() {
   using namespace gkxx::constjson;
 
-  using empty_object = parse<"{}">::result;
-  std::cout << pretty_type_name<empty_object>() << std::endl;
+  std::cout << pretty_type_name<parse<"{}">::result>() << std::endl;
 
-  using array = parse<"[\"a\", \"b\"]">::result;
-  std::cout << pretty_type_name<array>() << std::endl;
+  std::cout << pretty_type_name<parse<"[]">::result>() << std::endl;
+
+  std::cout << pretty_type_name<parse<"[\"a\", \"b\"]">::result>() << std::endl;
 
   using cppconfig_result = parse<cppconfig>::result;
   std::cout << gkxx::get_type_name<cppconfig_result>() << std::endl;
