@@ -18,48 +18,6 @@ Tokens:
   '{', '}', '[', ']', ',', ':'
  */
 
-/*
-{
-  "configuration": {
-    "name": "Linux",
-    "intelliSenseMode": "linux-clang-x64",
-    "compilerPath": "/usr/bin/clang++-16",
-    "cStandard": "c17",
-    "cppStandard": "c++20",
-    "includePath": [
-      "/usr/local/boost_1_80_0/",
-      "/home/gkxx/exercises/small_exercises/"
-    ],
-    "compilerArgs": [
-      "-Wall",
-      "-Wpedantic",
-      "-Wextra"
-    ]
-  },
-  "version": 4
-}
-
-Object<
-  Member<"configuration", Object<
-    Member<"name", String<"Linux">>,
-    Member<"IntelliSenseMode", String<"linux-clang-x64">>,
-    Member<"compilerPath", String<"/usr/bin/clang++-16">>,
-    Member<"cStandard", String<"c17">>,
-    Member<"cppStandard", String<"c++20">>,
-    Member<"includePath", Array<
-      String<"/usr/local/boost_1_80_0/">,
-      String<"/home/gkxx/exercises/small_exercises/">
-    >>,
-    Member<"compilerArgs", Array<
-      String<"-Wall">,
-      String<"-Wpedantic">,
-      String<"-Wextra">
-    >>
-  >>,
-  Member<"version", Int<4>>
->
- */
-
 namespace gkxx::constjson {
 
 template <int N>
@@ -195,7 +153,10 @@ struct TokenSequence {
         return "<Error token: " + T::message.to_string() + " at index " +
                std::to_string(T::position) + ">";
     };
-    return (... + to_string(static_cast<Tokens *>(nullptr)));
+    if constexpr (empty)
+      return {};
+    else
+      return (... + to_string(static_cast<Tokens *>(nullptr)));
   }
   static constexpr auto empty = (sizeof...(Tokens) == 0);
   static constexpr auto size = sizeof...(Tokens);
@@ -276,7 +237,6 @@ struct Tokenizer<Src>::token_getter {
   template <fixed_string Msg, std::size_t ErrorPos>
   using error_result_t = internal_result_t<ErrorToken<Msg, ErrorPos>>;
 
- private:
   static consteval auto match_true() noexcept {
     if constexpr (Pos + 3 < Src.size() && Src[Pos + 1] == 'r' &&
                   Src[Pos + 2] == 'u' && Src[Pos + 3] == 'e')
@@ -301,7 +261,6 @@ struct Tokenizer<Src>::token_getter {
   }
 
   struct string_matcher {
-   private:
     static consteval auto first_scan() noexcept {
       constexpr auto failure = Pos;
       if constexpr (Pos + 1 == Src.size())
@@ -360,12 +319,10 @@ struct Tokenizer<Src>::token_getter {
         return internal_result_t<String<get_contents()>, end_quote_pos + 1>{};
     }
 
-   public:
     using result = decltype(get_result());
   };
 
   struct integer_matcher {
-   private:
     template <std::size_t Cur>
     struct next_nondigit_pos {
       static consteval auto get_result() noexcept {
@@ -397,7 +354,6 @@ struct Tokenizer<Src>::token_getter {
     static constexpr auto overflow = value >
                                      (2147483647ul + static_cast<int>(neg));
 
-   public:
     using result = typename meta::switch_<
         0,
         meta::case_if<[](...) { return digits_length == 0; },
@@ -415,7 +371,6 @@ struct Tokenizer<Src>::token_getter {
             end_pos>>>::type;
   };
 
- public:
   using result = typename meta::switch_<
       Src[Pos], meta::case_<'{', internal_result_t<LBrace, Pos + 1>>,
       meta::case_<'}', internal_result_t<RBrace, Pos + 1>>,
