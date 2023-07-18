@@ -513,26 +513,26 @@ struct ParseTokens {
   struct member_parser;
 
   template <std::size_t Pos, template <std::size_t> typename element_parser,
-            template <typename...> typename list_type>
+            template <typename...> typename ListType>
   struct comma_list_parser;
 
-  template <std::size_t Pos, typename Left, typename Right,
-            template <std::size_t> typename list_parser>
+  template <std::size_t Pos, typename Empty, typename Left, typename Right,
+            template <std::size_t> typename ListParser>
   struct bracket_pair_list_parser;
 
   template <std::size_t Pos>
-  struct members_parser : comma_list_parser<Pos, member_parser, Object> {};
+  using members_parser = comma_list_parser<Pos, member_parser, Object>;
 
   template <std::size_t Pos>
-  struct values_parser : comma_list_parser<Pos, value_parser, Array> {};
+  using values_parser = comma_list_parser<Pos, value_parser, Array>;
 
   template <std::size_t Pos>
-  struct array_parser
-      : bracket_pair_list_parser<Pos, LBracket, RBracket, values_parser> {};
+  using array_parser =
+      bracket_pair_list_parser<Pos, Array<>, LBracket, RBracket, values_parser>;
 
   template <std::size_t Pos>
-  struct object_parser
-      : bracket_pair_list_parser<Pos, LBrace, RBrace, members_parser> {};
+  using object_parser =
+      bracket_pair_list_parser<Pos, Object<>, LBrace, RBrace, members_parser>;
 
   using result = typename value_parser<0>::result;
 };
@@ -557,8 +557,8 @@ struct ParseTokens<Tokens>::value_parser {
 };
 
 template <meta::specialization_of<TokenSequence> Tokens>
-template <std::size_t Pos, typename Left, typename Right,
-          template <std::size_t> typename list_parser>
+template <std::size_t Pos, typename Empty, typename Left, typename Right,
+          template <std::size_t> typename ListParser>
 struct ParseTokens<Tokens>::bracket_pair_list_parser {
   static consteval auto do_parse() noexcept {
     using lookahead = nth_token<Pos>;
@@ -570,9 +570,9 @@ struct ParseTokens<Tokens>::bracket_pair_list_parser {
   static consteval auto match_after_left() noexcept {
     using lookahead = nth_token<Pos + 1>;
     if constexpr (std::is_same_v<lookahead, Right>)
-      return internal_result_t<Object<>, Pos + 2>{};
+      return internal_result_t<Empty, Pos + 2>{};
     else {
-      using elements_result = typename list_parser<Pos + 1>::result;
+      using elements_result = typename ListParser<Pos + 1>::result;
       using elements_node = typename elements_result::node;
       if constexpr (detect::is_syntax_error<elements_node>)
         return elements_result{};
@@ -621,7 +621,7 @@ struct ParseTokens<Tokens>::member_parser {
 
 template <meta::specialization_of<TokenSequence> Tokens>
 template <std::size_t Pos, template <std::size_t> typename element_parser,
-          template <typename...> typename list_type>
+          template <typename...> typename ListType>
 struct ParseTokens<Tokens>::comma_list_parser {
   template <std::size_t CurPos, typename... CurElems>
   struct parse {
@@ -637,7 +637,7 @@ struct ParseTokens<Tokens>::comma_list_parser {
           return typename parse<next_pos + 1, CurElems...,
                                 new_elem_node>::result{};
         else
-          return internal_result_t<list_type<CurElems..., new_elem_node>,
+          return internal_result_t<ListType<CurElems..., new_elem_node>,
                                    next_pos>{};
       }
     }
