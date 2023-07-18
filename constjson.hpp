@@ -675,7 +675,7 @@ namespace pretty {
     return std::string(n, ' ');
   }
 
-  template <typename T>
+  template <CNode T>
   struct type_name;
 
   template <int N>
@@ -753,7 +753,7 @@ namespace pretty {
 
 } // namespace pretty
 
-template <typename T>
+template <CNode T>
 static constexpr auto pretty_type_name() {
   return pretty::type_name<T>::get(0);
 }
