@@ -1,8 +1,5 @@
 #include "../../constjson.hpp"
 
-#include "../../type_name.hpp"
-
-#include <fstream>
 #include <iostream>
 
 constexpr const char cppconfig[] = R"(
@@ -63,15 +60,15 @@ int main() {
   using namespace gkxx::constjson;
 
   using empty_object = parse<"{\"a\": 1}">::result;
-  std::cout << empty_object::to_pretty_string(0) << std::endl;
+  std::cout << pretty_type_name<empty_object>() << std::endl;
 
   using array = parse<"[\"a\", \"b\"]">::result;
-  std::cout << array::to_pretty_string(0) << std::endl;
+  std::cout << pretty_type_name<array>() << std::endl;
 
   using cppconfig_result = parse<cppconfig>::result;
-  std::cout << cppconfig_result::to_pretty_string(0) << std::endl;
+  std::cout << pretty_type_name<cppconfig_result>() << std::endl;
 
   using tasks_result = parse<tasks>::result;
-  std::cout << tasks_result::to_pretty_string(0) << std::endl;
+  std::cout << pretty_type_name<tasks_result>() << std::endl;
   return 0;
 }
