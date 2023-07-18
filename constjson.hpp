@@ -194,9 +194,9 @@ struct Tokenizer<Src>::token_getter {
                 "token_getter encounters a whitespace");
 
   template <CToken Token, std::size_t EndPos = static_cast<std::size_t>(-1)>
-    requires(!(!detect::is_error_token<Token> &&
-               EndPos == static_cast<std::size_t>(-1)))
   struct internal_result_t {
+    static_assert(!(!detect::is_error_token<Token> &&
+                    EndPos == static_cast<std::size_t>(-1)));
     using token = Token;
     static constexpr auto end_pos = EndPos;
   };
@@ -475,6 +475,9 @@ namespace detect {
 
 } // namespace detect
 
+template <typename T>
+concept CNode = CValue<T> || detect::is_member<T> || detect::is_syntax_error<T>;
+
 template <meta::specialization_of<TokenSequence> Tokens>
 struct ParseTokens {
   template <std::size_t N>
@@ -491,11 +494,11 @@ struct ParseTokens {
   template <std::size_t N>
   using nth_token = typename nth_token_impl<N>::result;
 
-  template <typename ParseResult,
+  template <CNode ParseResult,
             std::size_t NextPos = static_cast<std::size_t>(-1)>
-    requires(!(!detect::is_syntax_error<ParseResult> &&
-               NextPos == static_cast<std::size_t>(-1)))
   struct internal_result_t {
+    static_assert(!(!detect::is_syntax_error<ParseResult> &&
+                    NextPos == static_cast<std::size_t>(-1)));
     using node = ParseResult;
     static constexpr auto next_pos = NextPos;
   };
