@@ -1,9 +1,9 @@
-#include "../../constjson.hpp"
+#include "../../ctjson.hpp"
 #include "../../type_name.hpp"
 #include <iostream>
 
 int main() {
-  using namespace gkxx::constjson;
+  using namespace gkxx::ctjson;
 
   using result = parse<"{\"a\": 1, \"b\": 2, \"a\": 3}">::result;
   std::cout << gkxx::get_type_name<result>() << std::endl;

@@ -1,4 +1,4 @@
-#include "../../constjson.hpp"
+#include "../../ctjson.hpp"
 #include "../../type_name.hpp"
 
 #include <iostream>
@@ -58,7 +58,7 @@ constexpr const char tasks[] = R"(
 )";
 
 int main() {
-  using namespace gkxx::constjson;
+  using namespace gkxx::ctjson;
 
   std::cout << pretty_type_name<parse<"{}">::result>() << std::endl;
 

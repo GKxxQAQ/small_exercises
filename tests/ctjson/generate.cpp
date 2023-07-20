@@ -1,9 +1,9 @@
-#include "../../constjson.hpp"
+#include "../../ctjson.hpp"
 #include <fstream>
 #include <iostream>
 
 int main() {
-  using namespace gkxx::constjson;
+  using namespace gkxx::ctjson;
   using cppconfig = Object<
       Member<"configuration",
              Object<Member<"name", String<"Linux">>,

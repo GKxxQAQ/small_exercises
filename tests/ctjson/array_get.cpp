@@ -1,9 +1,9 @@
-#include "../../constjson.hpp"
+#include "../../ctjson.hpp"
 
 #include <iostream>
 
 int main() {
-  using namespace gkxx::constjson;
+  using namespace gkxx::ctjson;
   using array =
       Array<Integer<42>, String<"hello">, Integer<0>, Array<>, Object<>>;
   std::cout << pretty_type_name<array::get<0>>() << std::endl;

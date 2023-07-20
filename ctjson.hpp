@@ -1,5 +1,5 @@
-#ifndef GKXX_CONSTJSON_HPP
-#define GKXX_CONSTJSON_HPP
+#ifndef GKXX_CTJSON_HPP
+#define GKXX_CTJSON_HPP
 
 #include <concepts>
 #include <string>
@@ -18,7 +18,7 @@ Tokens:
   '{', '}', '[', ']', ',', ':'
  */
 
-namespace gkxx::constjson {
+namespace gkxx::ctjson {
 
 template <int N>
 struct Integer {
@@ -811,6 +811,6 @@ static constexpr auto pretty_type_name() {
   return pretty::type_name<T>::get(0);
 }
 
-} // namespace gkxx::constjson
+} // namespace gkxx::ctjson
 
-#endif // GKXX_CONSTJSON_HPP
+#endif // GKXX_CTJSON_HPP

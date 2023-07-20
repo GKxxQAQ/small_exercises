@@ -1,4 +1,4 @@
-#include "../../constjson.hpp"
+#include "../../ctjson.hpp"
 
 #include "../../type_name.hpp"
 
@@ -61,13 +61,13 @@ constexpr const char tasks[] = R"(
 
 int main() {
   using type =
-      gkxx::constjson::Tokenizer<"42 \"hello world\" : , , :::">::result;
+      gkxx::ctjson::Tokenizer<"42 \"hello world\" : , , :::">::result;
   std::cout << gkxx::get_type_name<type>() << std::endl;
-  using big_result = gkxx::constjson::Tokenizer<cppconfig>::result;
+  using big_result = gkxx::ctjson::Tokenizer<cppconfig>::result;
   std::cout << gkxx::get_type_name<big_result>() << std::endl;
   std::ofstream("cppconfig.json")
       << big_result::reconstruct_string() << std::endl;
-  using tasks_result = gkxx::constjson::Tokenizer<tasks>::result;
+  using tasks_result = gkxx::ctjson::Tokenizer<tasks>::result;
   std::cout << gkxx::get_type_name<tasks_result>() << std::endl;
   std::ofstream("tasks.json")
       << tasks_result::reconstruct_string() << std::endl;
