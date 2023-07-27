@@ -52,7 +52,7 @@ class function<R(Args...)> {
 
   // (3)
   function(const function &other) : pimpl{} {
-    if (other.impl)
+    if (other.pimpl)
       pimpl = other.pimpl->clone();
   }
 
@@ -61,7 +61,8 @@ class function<R(Args...)> {
 
   // (5)
   template <typename Fn>
-    requires std::is_invocable_r_v<R, std::decay_t<Fn> &, Args...>
+    requires(std::is_invocable_r_v<R, std::decay_t<Fn> &, Args...> &&
+             !std::is_same_v<std::decay_t<Fn>, function>)
   function(Fn &&fn) : pimpl{} { // TODO: noexcept-ness
     using target = std::decay_t<Fn>;
 
@@ -105,7 +106,7 @@ class function<R(Args...)> {
   ~function() = default;
 
   void swap(function &other) noexcept {
-    pimpl.swap(other);
+    pimpl.swap(other.pimpl);
   }
 
   explicit operator bool() const noexcept {
