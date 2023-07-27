@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "invoke.hpp"
+#include "memory/unique_ptr.hpp"
 
 namespace gkxx {
 
@@ -73,7 +74,7 @@ class function<R(Args...)> {
                   "constructor argument");
 
     if (detail::not_empty_function(fn))
-      pimpl = std::make_unique<wrapper<target>>(std::forward<Fn>(fn));
+      pimpl = make_unique<wrapper<target>>(std::forward<Fn>(fn));
   }
 
   // (1), (2)
@@ -142,7 +143,7 @@ class function<R(Args...)> {
  private:
   struct wrapper_base {
     virtual ~wrapper_base() = default;
-    virtual auto clone() const -> std::unique_ptr<wrapper_base> = 0;
+    virtual auto clone() const -> unique_ptr<wrapper_base> = 0;
     virtual auto invoke(Args... args) const -> R = 0;
     virtual auto get_typeid() const -> const std::type_info & = 0;
     virtual auto get_ptr() -> void * = 0;
@@ -153,8 +154,8 @@ class function<R(Args...)> {
     F func;
     template <typename Fn>
     wrapper(Fn &&fn) : func(std::forward<Fn>(fn)) {}
-    std::unique_ptr<wrapper_base> clone() const final {
-      return std::make_unique<wrapper<F>>(func);
+    unique_ptr<wrapper_base> clone() const final {
+      return make_unique<wrapper<F>>(func);
     }
     R invoke(Args... args) const final {
       return ::gkxx::invoke(func, std::forward<Args>(args)...);
@@ -167,7 +168,7 @@ class function<R(Args...)> {
     }
     ~wrapper() = default;
   };
-  std::unique_ptr<wrapper_base> pimpl;
+  unique_ptr<wrapper_base> pimpl;
 };
 
 template <typename R, typename... Args>
