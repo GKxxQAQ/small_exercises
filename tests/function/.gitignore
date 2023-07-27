@@ -1,1 +1,7 @@
 general
+operator_bool
+operator_call
+target_type
+target
+swap
+equality
