@@ -194,28 +194,6 @@ namespace detail {
     return std::move(m.value);
   }
 
-  template <fixed_string Tag, typename T, auto Init>
-  inline constexpr volatile T &get_impl(volatile member<Tag, T, Init> &m) {
-    return m.value;
-  }
-
-  template <fixed_string Tag, typename T, auto Init>
-  inline constexpr volatile T &&get_impl(volatile member<Tag, T, Init> &&m) {
-    return std::move(m.value);
-  }
-
-  template <fixed_string Tag, typename T, auto Init>
-  inline constexpr const volatile T &
-  get_impl(const volatile member<Tag, T, Init> &m) {
-    return m.value;
-  }
-
-  template <fixed_string Tag, typename T, auto Init>
-  inline constexpr const volatile T &&
-  get_impl(const volatile member<Tag, T, Init> &&m) {
-    return std::move(m.value);
-  }
-
 } // namespace detail
 
 template <fixed_string Tag, typename MS>
