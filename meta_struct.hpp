@@ -127,7 +127,7 @@ template <fixed_string... Tags>
 struct tag_list {
   template <template <typename...> typename Container>
   static constexpr Container<std::string_view> as_container() {
-    return {Tags.as_sv()...};
+    return {Tags.to_string_view()...};
   }
   template <fixed_string S>
   static inline constexpr auto contains = (... || (Tags == S));
