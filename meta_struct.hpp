@@ -129,6 +129,9 @@ struct tag_list {
   static constexpr Container<std::string_view> as_container() {
     return {Tags.to_string_view()...};
   }
+  static constexpr std::array as_array() {
+    return {Tags.to_string_view()...};
+  }
   template <fixed_string S>
   static inline constexpr auto contains = (... || (Tags == S));
 };
