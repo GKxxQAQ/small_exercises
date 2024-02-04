@@ -231,11 +231,6 @@ inline bool operator==(const function<R(Args...)> &f, std::nullptr_t) noexcept {
   return !f;
 }
 
-template <typename R, typename... Args>
-inline bool operator==(std::nullptr_t, const function<R(Args...)> &f) noexcept {
-  return !f;
-}
-
 } // namespace gkxx
 
 namespace std {
