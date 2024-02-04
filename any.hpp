@@ -8,15 +8,9 @@
 #include <utility>
 #include <algorithm>
 
+#include "in_place.hpp"
+
 namespace gkxx {
-
-template <typename T>
-struct in_place_type_t {
-  explicit in_place_type_t() = default;
-};
-
-template <typename T>
-inline constexpr in_place_type_t<T> in_place_type{};
 
 struct bad_any_cast : public std::bad_cast {
   const char *what() const noexcept override {
